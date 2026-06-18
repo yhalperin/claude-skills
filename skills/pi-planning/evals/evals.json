@@ -1,0 +1,78 @@
+{
+  "skill_name": "pi-planning",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm a PM preparing for our 26-Q3 PI planning event which starts next week. Here are the themes we're considering:\n\n1. 'Zero-Trust Network Access' - Status: Ready for Planning. Broken into 4 epics, dependencies with the infra team mapped.\n2. 'Customer Self-Service Portal' - Status: HL Solution Design. Architecture still in progress, UX not finalized.\n3. 'AI-Assisted Alert Triage' - Status: Ready for Planning. 3 epics defined, T-shirt sizes done.\n4. 'Legacy API Deprecation' - Status: HL Product Design. PRD not mature, no R&D estimates yet.\n5. 'SOC2 Type II Controls' - Status: Ready for Planning. 2 epics, security team owns it.\n\nWhich themes can we plan this PI, and what should we do about the ones that aren't ready?",
+      "expected_output": "Should identify themes 1, 3, and 5 as plannable. Theme 2 needs HL Solution Design completion before planning. Theme 4 has the most gaps and should not be planned. Should provide concrete next steps for each non-ready theme with owner recommendations.",
+      "assertions": [
+        {
+          "name": "correctly_identifies_ready_themes",
+          "description": "Identifies themes 1, 3, and 5 as ready for planning and themes 2 and 4 as not ready"
+        },
+        {
+          "name": "provides_gap_analysis",
+          "description": "For each non-ready theme, explains what specific gaps prevent planning and who should address them"
+        },
+        {
+          "name": "references_planned_equals_commit",
+          "description": "Mentions the Planned = Commit principle in context of what it means for the themes being planned"
+        },
+        {
+          "name": "actionable_output",
+          "description": "Output includes concrete next steps with clear ownership (PM, PO, Architect) per theme"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We're in the middle of 26-Q2 PI planning. I have 3 ready themes to plan across 6 sprints (S1-S6), each 2 weeks. The team has roughly 40 story points per sprint capacity.\n\nTheme 1 (Priority 1): 'Kubernetes Migration' - 4 epics already defined:\n  - Epic A: Containerize microservices (M, ~3 sprints)\n  - Epic B: Set up K8s cluster (S, ~1 sprint)\n  - Epic C: Migrate dev environment (M, ~2 sprints)\n  - Epic D: Migrate prod environment (L, ~3 sprints)\n\nTheme 2 (Priority 2): 'User Permissions Overhaul' - 3 epics:\n  - Epic E: New roles data model (S, ~1 sprint)\n  - Epic F: UI for role assignment (M, ~2 sprints)\n  - Epic G: API enforcement layer (M, ~2 sprints)\n\nTheme 3 (Priority 3): 'Reporting Dashboard v2' - 2 epics:\n  - Epic H: New chart components (S, ~1 sprint)\n  - Epic I: Data export feature (M, ~2 sprints)\n\nPlease generate a PI plan.",
+      "expected_output": "Should produce a sprint-by-sprint breakdown that respects dependencies (e.g., K8s cluster before migration, data model before UI/API). Should plan Theme 1 completely before moving to Theme 2. Should assign start and finish sprints to each epic. Should flag if anything can't fit and recommend stretch vs. commit status.",
+      "assertions": [
+        {
+          "name": "theme_priority_order",
+          "description": "Plans Theme 1 fully before starting Theme 2, which is planned before Theme 3"
+        },
+        {
+          "name": "start_finish_sprints_assigned",
+          "description": "Every epic has an explicit start sprint and finish sprint assigned"
+        },
+        {
+          "name": "logical_dependencies_respected",
+          "description": "Epic B (K8s cluster setup) is planned before Epic D (prod migration); Epic E (data model) before Epic F and G"
+        },
+        {
+          "name": "roadmap_table_format",
+          "description": "Output includes a tabular roadmap showing Theme, Epic, Start Sprint, Finish Sprint, and Status"
+        },
+        {
+          "name": "theme_finish_dates",
+          "description": "Each Theme has an identified finish date based on its last epic's finish sprint"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I need to prepare for our bi-weekly grooming meeting for the 26-Q3 PI. We're 5 weeks out from PI start. Can you give me a meeting agenda and a checklist of what to validate for each theme in the backlog?",
+      "expected_output": "Should generate a practical bi-weekly grooming meeting agenda covering: priority review, readiness status per theme, scope changes (add/remove), open issues, and action items. Should include a per-theme readiness checklist aligned to the theme workflow phases (HL Product Design → HL Solution Design → Ready for Planning). Should mention the target of continuously moving themes to Ready for Implementation before PI planning.",
+      "assertions": [
+        {
+          "name": "meeting_agenda_structure",
+          "description": "Provides a structured agenda with time boxes or sections for the grooming meeting"
+        },
+        {
+          "name": "readiness_checklist",
+          "description": "Includes a per-theme checklist that maps to the workflow phases (HL Product Design, HL Solution Design, Ready for Planning)"
+        },
+        {
+          "name": "priority_vs_readiness_distinction",
+          "description": "Clarifies that priority is set by business value, not readiness — critical items get higher priority regardless"
+        },
+        {
+          "name": "scope_control_guidance",
+          "description": "Mentions limiting theme count to team velocity and keeping only prioritized themes in the PI backlog"
+        }
+      ]
+    }
+  ]
+}
