@@ -1,0 +1,59 @@
+{
+  "generatedAt": "2026-07-13T15:55:00+03:00",
+  "initiatives": {
+    "jag-36913": {
+      "title": "JAG-36913: Priv Cloud centralization + guided flows + Dark mode",
+      "status": "On Track",
+      "statusColor": "emerald",
+      "scope": "TBD",
+      "horizon": "Target TBD",
+      "timelineRange": "TBD",
+      "stats": {
+        "totalFeatures": 13,
+        "completedFeatures": 4,
+        "timelineTarget": "TBD",
+        "timelineVariance": "On Schedule"
+      },
+      "risks": [],
+      "masterFeatures": [
+        {
+          "name": "Master-Feature: Priv Cloud centralization (SHLD-28144)",
+          "status": "In Progress",
+          "progress": 57,
+          "targetDate": "TBD",
+          "features": [
+            { "name": "Safe page visibility (SHLD-28189)", "group": "EPV", "status": "In Progress", "progress": 50, "date": "TBD" },
+            { "name": "Centralization - PVWA (SHLD-28145)", "group": "EPV", "status": "In Progress", "progress": 50, "date": "TBD" },
+            { "name": "Centralization - Advanced settings, Reports and Applications pages to Admin space (JAG-38059)", "group": "pCloud", "status": "In Progress", "progress": 50, "date": "TBD" },
+            { "name": "Centralization - SRS (JAG-37947)", "group": "pCloud", "status": "Planned", "progress": 0, "date": "TBD" },
+            { "name": "Centralization - Support Pcloud centralization (EV-98902)", "group": "Alps", "status": "In Progress", "progress": 50, "date": "TBD" },
+            { "name": "Audit: move pCloud pages to the Audit space (EV-96146)", "group": "Pacific", "status": "Completed", "progress": 100, "date": "TBD" },
+            { "name": "[pCloud PVWA request] Test application page move to new space (CP-20117)", "group": "Platform Core", "status": "Completed", "progress": 100, "date": "TBD" }
+          ]
+        },
+        {
+          "name": "Master-Feature: Priv Cloud Dark Mode Support (SHLD-28140)",
+          "status": "In Progress",
+          "progress": 70,
+          "targetDate": "TBD",
+          "features": [
+            { "name": "Dark Mode Support - SRS (July) (SHLD-28856)", "group": "pCloud", "status": "Completed", "progress": 100, "date": "TBD" },
+            { "name": "Dark Mode Support - PVWA (July) (SHLD-28141)", "group": "EPV", "status": "In Progress", "progress": 50, "date": "TBD" },
+            { "name": "PSM - Dark mode for PSM SM pages and ad hoc pop up (PCPSM-5824)", "group": "Mercury", "status": "In Progress", "progress": 50, "date": "TBD" },
+            { "name": "Support Dark mode in Advanced settings page (JAG-38058)", "group": "pCloud", "status": "In Progress", "progress": 50, "date": "TBD" },
+            { "name": "Support dark mode for Pcloud pages + help with V10 pages (EV-98893)", "group": "Alps", "status": "Completed", "progress": 100, "date": "TBD" }
+          ]
+        },
+        {
+          "name": "Master-Feature: Guided Flow - Add PSM for CC use cases (PCPSM-6580)",
+          "status": "Planned",
+          "progress": 0,
+          "targetDate": "TBD",
+          "features": [
+            { "name": "Guided Flow - Add PSM for CC use cases (PCPSM-6581)", "group": "Platform Core", "status": "Planned", "progress": 0, "date": "TBD" }
+          ]
+        }
+      ]
+    }
+  }
+}

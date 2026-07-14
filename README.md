@@ -16,14 +16,19 @@ A **skill** is a Markdown file (`SKILL.md`) that you drop into Claude Code's ski
 | Skill | Description |
 |-------|-------------|
 | [pi-planning](skills/pi-planning/) | PI Planning facilitator for program managers and POs. Covers theme readiness assessment, sprint-based epic planning, grooming meeting agendas, and all four PI lifecycle phases — grounded in the PSDLC process. |
+| [initiative-status-dashboard](skills/initiative-status-dashboard/) | Traverses one or more Jira Initiatives (Initiative → Master Feature → leaf Feature) and renders them as a self-contained HTML dashboard with KPI cards, a Master-Feature milestone table, a Jira-Group allocation swimlane matrix, and a manually-editable Risks panel. |
+| [pi-readiness-dashboard](skills/pi-readiness-dashboard/) | Builds a self-contained "PI Readiness Command Center" HTML dashboard from live Jira Theme issues for a chosen Program Increment, with KPI cards, a status/division bar chart, a portfolio composition donut, a themes registry table, and an in-browser Division → Group drill-down filter. |
+| [release-scope-dashboard](skills/release-scope-dashboard/) | Extracts a release's scope and current status from Jira and renders it as a self-contained HTML dashboard with a completion gauge, per-type status donuts, Themes/Epics grouped into headline sections, and a filterable bug list. |
 
 ## How to Install a Skill
 
-1. Copy the skill folder (e.g. `skills/pi-planning/`) into your Claude Code skills directory:
-   - **Windows:** `C:\Users\<you>\.claude\skills\`
-   - **Mac/Linux:** `~/.claude/skills/`
-2. In Claude Code, invoke the skill with `/pi-planning` (or whatever the skill name is).
-3. Claude will load the skill and act as a specialized assistant for that domain.
+1. Copy the skill folder (e.g. `skills/pi-planning/`) into your agent's skills directory:
+   - **Claude Code — Windows:** `C:\Users\<you>\.claude\skills\`
+   - **Claude Code — Mac/Linux:** `~/.claude/skills/`
+   - **Cursor — Windows:** `C:\Users\<you>\.cursor\skills\`
+   - **Cursor — Mac/Linux:** `~/.cursor/skills/`
+2. Invoke the skill with `/pi-planning` (or whatever the skill name is), or let the agent trigger it automatically based on its description.
+3. The agent will load the skill and act as a specialized assistant for that domain.
 
 ## Contributing
 

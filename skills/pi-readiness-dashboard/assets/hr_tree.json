@@ -1,0 +1,78 @@
+{
+  "AI data and Labs": [
+    "AI Solutions"
+  ],
+  "Access & Risk": [
+    "Alero",
+    "Jupiter",
+    "Mercury",
+    "Saturn"
+  ],
+  "Cloud Security": [
+    "BCA",
+    "Kyoto",
+    "SCA"
+  ],
+  "Data & AI Platform Services": [
+    "CORA-AI",
+    "Data Fabric",
+    "Threat & Analytics"
+  ],
+  "EPM": [
+    "EPM agents",
+    "EPM server"
+  ],
+  "IGA": [
+    "IGA Connectors",
+    "IGA Platform",
+    "IGA Workflows"
+  ],
+  "ISP Platform Services": [
+    "Alps",
+    "Asgard",
+    "Himalayas"
+  ],
+  "Identity": [
+    "Identity Core & Infra",
+    "Identity Management",
+    "Identity Shared Services",
+    "Identity Workforce & Access Management"
+  ],
+  "Platform Developer": [
+    "Nimbus",
+    "Olympus"
+  ],
+  "Privilege Cloud": [
+    "DV",
+    "EPV",
+    "pCloud"
+  ],
+  "Privilege Self Hosted": [
+    "Extensions",
+    "SH BreakGlass",
+    "SH CPM",
+    "SH DV",
+    "SH H2P",
+    "SH OPM",
+    "SH PAM on Cloud",
+    "SH PSM",
+    "SH PSMP",
+    "SH PTA",
+    "SHPVWA"
+  ],
+  "Production Engineering": [
+    "Identity SRE",
+    "PCE",
+    "Production Engineering",
+    "RACE"
+  ],
+  "Secrets Manager": [
+    "CP",
+    "Conjur Cloud",
+    "Conjur Enterprise",
+    "SWA",
+    "Secrets Hub",
+    "Secrets Manager Shared",
+    "Secure AI Agents"
+  ]
+}

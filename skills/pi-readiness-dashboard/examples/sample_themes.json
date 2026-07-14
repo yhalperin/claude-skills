@@ -1,0 +1,32 @@
+[
+  {
+    "id": "AGAI-1440",
+    "title": "Token exchange - Identity support & tests",
+    "divisions": ["Secrets Manager"],
+    "groups": ["Secure AI Agents"],
+    "status": "In Progress",
+    "owner": "Tal Zamir",
+    "flagged": false,
+    "url": "https://ca-il-jira.il.cyber-ark.com:8443/browse/AGAI-1440"
+  },
+  {
+    "id": "CC-198192",
+    "title": "WPM to save, manage and share passkeys for web applications",
+    "divisions": ["Identity"],
+    "groups": ["Identity Workforce & Access Management"],
+    "status": "Planned",
+    "owner": null,
+    "flagged": false,
+    "url": "https://ca-il-jira.il.cyber-ark.com:8443/browse/CC-198192"
+  },
+  {
+    "id": "SCA-52199",
+    "title": "SCA Tile Deprecation",
+    "divisions": ["Cloud Security"],
+    "groups": ["SCA"],
+    "status": "Not Ready",
+    "owner": "Adi Moldavski",
+    "flagged": false,
+    "url": "https://ca-il-jira.il.cyber-ark.com:8443/browse/SCA-52199"
+  }
+]

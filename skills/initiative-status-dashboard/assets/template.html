@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initiative Status Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbars for clean table layout */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        /* Pulse for highlight items */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.5; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+        .pulse-dot::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: inherit;
+            animation: pulse-ring 2s infinite ease-in-out;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 min-h-screen">
+
+    <div class="flex flex-col min-h-screen">
+
+        <!-- Global Header -->
+        <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+
+                <!-- Left: Logo & Initiative Selection -->
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-9 h-9 bg-brand-600 rounded-lg flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                            <i data-lucide="compass" class="w-5 h-5"></i>
+                        </div>
+                        <div class="hidden md:block">
+                            <h1 class="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">PM Blueprint</h1>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">INITIATIVE TARGETING SYSTEM</p>
+                        </div>
+                    </div>
+
+                    <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+
+                    <!-- Initiative Selector: options populated dynamically from INITIATIVE_DATA on load -->
+                    <div class="relative">
+                        <select id="initiative-selector" onchange="changeInitiative(this.value)" class="appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm rounded-lg pl-3 pr-8 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer max-w-[220px] sm:max-w-none truncate">
+                        </select>
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                    </div>
+
+                    <!-- Initiative Overall Health Badge -->
+                    <span id="global-status-badge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 relative flex pulse-dot"></span>
+                        On Track
+                    </span>
+                </div>
+
+                <!-- Right Header Tools -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- Jira Sync Trigger -->
+                    <button onclick="triggerJiraSync()" class="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-300 transition-all duration-200" id="sync-button">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="sync-icon"></i>
+                        <span class="hidden sm:inline">Pull JIRA Schema</span>
+                    </button>
+
+                    <!-- CSV Import Panel Toggle -->
+                    <button onclick="toggleCSVEditor()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-300 transition-all">
+                        <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                        <span class="hidden md:inline">Jira CSV Schema</span>
+                    </button>
+
+                    <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+
+                    <!-- Theme Toggle -->
+                    <button onclick="toggleDarkMode()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
+                        <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                        <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+                    </button>
+
+                    <div class="w-8 h-8 rounded-full bg-brand-600 text-white font-semibold text-xs flex items-center justify-center cursor-pointer shadow border border-slate-200 dark:border-slate-700">
+                        PM
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+            <!-- Quick Alert / Sync Info -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl text-xs text-slate-500 dark:text-slate-400">
+                <div class="flex items-center gap-2">
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+                    </span>
+                    <span>Active Workspace Synchronized. Milestones resolved from **Target Finish Dates** in Jira. Last updated: <strong id="last-sync-timestamp">just now</strong></span>
+                </div>
+                <div class="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 font-semibold cursor-pointer hover:underline" onclick="toggleCSVEditor()">
+                    <i data-lucide="settings" class="w-3.5 h-3.5"></i> Configure CSV Fields
+                </div>
+            </div>
+
+            <!-- Tabs and Filters Panel -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <div class="flex gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl w-fit">
+                    <button id="tab-snapshot-btn" onclick="switchTab('snapshot')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm">
+                        <i data-lucide="layout" class="w-4 h-4"></i>
+                        Executive Summary
+                    </button>
+                    <button id="tab-matrix-btn" onclick="switchTab('matrix')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+                        <i data-lucide="split" class="w-4 h-4"></i>
+                        Allocation Swimlanes
+                    </button>
+                </div>
+
+                <!-- Time Horizon Indicator -->
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="text-slate-400">Planning Scope:</span>
+                    <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700" id="initiative-scope-badge">TBD</span>
+                    <span class="text-slate-400">Planned Horizon:</span>
+                    <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700" id="initiative-horizon-badge">TBD</span>
+                </div>
+            </div>
+
+            <div id="tab-snapshot" class="space-y-6">
+
+                <!-- Bento Box KPI Metrics Row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+                    <!-- KPI 1: Overall Completion (Features based) -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-brand-500/10 rounded-full blur-xl transition-all duration-300"></div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Initiative Progress</span>
+                                <h3 class="text-3xl font-bold mt-1 text-slate-900 dark:text-white" id="stat-progress-txt">0%</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/50 flex items-center justify-center text-brand-600 dark:text-brand-400">
+                                <i data-lucide="activity" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 space-y-2">
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="stat-progress-bar" class="bg-brand-500 h-2 rounded-full transition-all duration-500" style="width: 0%;"></div>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                <span id="features-ratio-text">0 / 0 Features Delivered</span>
+                                <span class="font-medium text-emerald-600 dark:text-emerald-400">Features Rollup</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KPI 2: Timeline Target -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl transition-all duration-300"></div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Planned Timeline</span>
+                                <h3 class="text-xl font-bold mt-2 text-indigo-600 dark:text-indigo-400 truncate" id="stat-timeline-range">N/A</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                <i data-lucide="calendar" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 space-y-1">
+                            <div class="flex justify-between items-center text-xs text-slate-500">
+                                <span>Timeline Target:</span>
+                                <span class="font-semibold text-slate-800 dark:text-slate-200" id="stat-timeline-target">N/A</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs text-slate-500">
+                                <span>Status Sync:</span>
+                                <span class="font-semibold text-emerald-600 dark:text-emerald-400" id="stat-timeline-variance">On Schedule</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KPI 3: Group Workload Breakdown -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl transition-all duration-300"></div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Group Distribution</span>
+                                <h3 class="text-3xl font-bold mt-1 text-emerald-600 dark:text-emerald-400" id="stat-active-groups">0 Groups</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                <i data-lucide="users" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+
+                        <!-- Simple visual distribution indicator -->
+                        <div class="mt-5 space-y-2">
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden flex" id="stat-distribution-bar">
+                                <!-- Dynamic block segments filled by JS -->
+                            </div>
+                            <div class="flex items-center flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400" id="stat-distribution-legend">
+                                <!-- Dynamic group legend filled by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Snapshot Main Content Area -->
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+                    <!-- Left Column: Master-Features (Milestones) Tracking Table (60%) -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm lg:col-span-3">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-900 dark:text-white">Master-Features (Milestones)</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Core milestone delivery rollup with corresponding execution health</p>
+                            </div>
+                            <div class="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500 font-mono">
+                                1 Master-Feature = 1 Major Milestone
+                            </div>
+                        </div>
+
+                        <!-- Milestone Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase font-semibold">
+                                        <th class="py-3 px-2">Master-Feature</th>
+                                        <th class="py-3 px-2 text-center">Status</th>
+                                        <th class="py-3 px-2">Planned Target</th>
+                                        <th class="py-3 px-2 text-right">Feature Rollup Progress</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="milestones-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Initiative Risks (40%) -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm lg:col-span-2 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-900 dark:text-white">Initiative Risks</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Manually tracked risks & blockers</p>
+                            </div>
+                            <button onclick="openRiskForm()" class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-all flex-shrink-0">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Risk
+                            </button>
+                        </div>
+
+                        <!-- Inline Add-Risk Form (hidden by default) -->
+                        <div id="risk-form" class="hidden mb-4 p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+                            <input id="risk-title-input" type="text" placeholder="Risk title" class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                            <textarea id="risk-desc-input" placeholder="Description (optional)" rows="2" class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500"></textarea>
+                            <div class="flex gap-2">
+                                <select id="risk-severity-input" class="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                    <option value="critical">Critical</option>
+                                    <option value="warning" selected>Warning</option>
+                                    <option value="info">Info</option>
+                                </select>
+                                <input id="risk-owner-input" type="text" placeholder="Owner (optional)" class="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                            </div>
+                            <div class="flex gap-2 justify-end pt-1">
+                                <button onclick="closeRiskForm()" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700">Cancel</button>
+                                <button onclick="saveNewRisk()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-700 text-white">Save Risk</button>
+                            </div>
+                        </div>
+
+                        <div id="risks-list-container" class="space-y-2.5 overflow-y-auto max-h-[280px] flex-grow">
+                            <!-- Dynamic risk cards -->
+                        </div>
+
+                        <!-- Risk persistence controls -->
+                        <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                            <span class="text-[10px] text-slate-400 leading-snug">Saved locally in this browser.<br>Export/import to carry risks across dashboard regenerations.</span>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <button onclick="exportRisks()" class="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-medium rounded-lg text-slate-600 dark:text-slate-300">
+                                    <i data-lucide="download" class="w-3 h-3"></i> Export
+                                </button>
+                                <button onclick="document.getElementById('risk-import-input').click()" class="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-medium rounded-lg text-slate-600 dark:text-slate-300">
+                                    <i data-lucide="upload" class="w-3 h-3"></i> Import
+                                </button>
+                                <input id="risk-import-input" type="file" accept="application/json" class="hidden" onchange="importRisksFile(event)" />
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div id="tab-matrix" class="hidden space-y-6">
+
+                <!-- Filter bar & matrix interactive instructions -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Features Group Allocation</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Distribution of features across execution groups. **Click a Master-Feature in the left column** to isolate and focus on its features.</p>
+                    </div>
+
+                    <!-- Filter state banner -->
+                    <div class="flex items-center gap-2 text-xs" id="matrix-filter-banner-container">
+                        <!-- Active filters injected dynamically here -->
+                    </div>
+                </div>
+
+                <!-- Swimlane Matrix Grid -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse text-left text-xs min-w-[900px]">
+                            <thead>
+                                <tr id="matrix-header-row" class="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-850">
+                                    <th class="py-4 px-4 w-[280px] font-semibold text-slate-500 dark:text-slate-400">Master-Feature (Milestone)</th>
+                                    <!-- Group columns injected dynamically based on each Theme's live "Group" field -->
+                                </tr>
+                            </thead>
+                            <tbody id="matrix-swimlane-body" class="divide-y divide-slate-150 dark:divide-slate-800">
+                                <!-- Dynamically populated based on selected initiative & filtering -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Matrix footer explanation and legend -->
+                    <div class="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-150 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span> Completed Feature (100%)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span> In Progress Feature (1-99%)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-rose-500"></span> Blocked Feature (Stalled)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-slate-300 dark:bg-slate-600"></span> Planned Feature (0%)</span>
+                        </div>
+                        <span class="text-slate-400 font-medium">Progress indicators are colored dynamically by active status values.</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+
+        <!-- Slide-Over/Modal: CSV Data Schema Studio -->
+        <div id="csv-drawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between overflow-hidden">
+            <div class="p-6 overflow-y-auto space-y-6 flex-grow">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900 dark:text-white">JIRA CSV Export Schema</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Map fields exported directly from JIRA filter tables</p>
+                    </div>
+                    <button onclick="toggleCSVEditor()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">JIRA Standard CSV Headers Mapping</label>
+                    <p class="text-xs text-slate-400 mb-2">Configure how master-features and features are structured from JIRA fields:</p>
+                    <textarea id="csv-raw-textarea" rows="11" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 p-3 rounded-xl font-mono text-[10px] text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-brand-500 focus:outline-none"></textarea>
+                </div>
+
+                <!-- Simulation Guidance Info -->
+                <div class="bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs space-y-2 text-slate-600 dark:text-slate-300">
+                    <span class="font-bold text-slate-700 dark:text-slate-200 block">💡 Field Sync Instructions:</span>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-500">
+                        <li><strong class="text-slate-700 dark:text-slate-300">Master-Feature:</strong> Map to JIRA <code class="p-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[10px]">Epic Link</code> or Parent.</li>
+                        <li><strong class="text-slate-700 dark:text-slate-300">Feature:</strong> Standard JIRA <code class="p-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[10px]">Summary</code> of nested tasks.</li>
+                        <li><strong class="text-slate-700 dark:text-slate-300">Group/Division:</strong> Map to JIRA <code class="p-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[10px]">Component</code> or Custom Team fields.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Drawer Footer -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+                <button onclick="saveAndApplyCSV()" class="flex-grow py-2 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all">
+                    Apply Schema
+                </button>
+                <button onclick="toggleCSVEditor()" class="py-2 px-4 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all">
+                    Cancel
+                </button>
+            </div>
+        </div>
+
+        <!-- Global Toast Alert Container -->
+        <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+        <!-- Footer Info -->
+        <footer class="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-850 py-6 mt-12 transition-colors duration-300">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-slate-400">
+                <p>&copy; 2026 PM Blueprint. Structured tracking systems mapped from native JIRA hierarchy.</p>
+                <div class="flex gap-4">
+                    <a href="javascript:void(0)" class="hover:text-slate-600 dark:hover:text-slate-200 transition-all">Jira REST Setup</a>
+                    <span>&bull;</span>
+                    <a href="javascript:void(0)" onclick="reloadDashboard()" class="text-brand-500 hover:underline">Reload Dashboard</a>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Data payload injected by scripts/render_dashboard.py at build time. See ../DATA_SCHEMA.md for the shape. -->
+    <script type="application/json" id="initiative-data">__INITIATIVE_DATA_JSON__</script>
+    <script>
+        const PAYLOAD = JSON.parse(document.getElementById("initiative-data").textContent);
+        const INITIATIVE_DATA = PAYLOAD.initiatives;
+
+        // Active Application State tracking variables
+        let currentInitiativeKey = Object.keys(INITIATIVE_DATA)[0];
+        let activeMasterFeatureFilter = null; // Filter for swimlanes
+
+        // Dom components pointers
+        const elInitiativeSelector = document.getElementById("initiative-selector");
+        const elGlobalStatusBadge = document.getElementById("global-status-badge");
+        const elStatProgressTxt = document.getElementById("stat-progress-txt");
+        const elStatProgressBar = document.getElementById("stat-progress-bar");
+        const elFeaturesRatioText = document.getElementById("features-ratio-text");
+        const elStatTimelineRange = document.getElementById("stat-timeline-range");
+        const elStatTimelineTarget = document.getElementById("stat-timeline-target");
+        const elStatTimelineVariance = document.getElementById("stat-timeline-variance");
+        const elMilestonesTableBody = document.getElementById("milestones-table-body");
+        const elMatrixSwimlaneBody = document.getElementById("matrix-swimlane-body");
+        const elCsvDrawer = document.getElementById("csv-drawer");
+        const elCsvRawTextarea = document.getElementById("csv-raw-textarea");
+        const elFilterBannerContainer = document.getElementById("matrix-filter-banner-container");
+        const elRisksListContainer = document.getElementById("risks-list-container");
+        const elRiskForm = document.getElementById("risk-form");
+
+        window.onload = function() {
+            lucide.createIcons();
+            populateInitiativeSelector();
+            elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
+            renderDashboard();
+        };
+
+        // Build the initiative dropdown from whatever keys are present in INITIATIVE_DATA - supports 1..N initiatives
+        function populateInitiativeSelector() {
+            elInitiativeSelector.innerHTML = Object.keys(INITIATIVE_DATA).map(key =>
+                `<option value="${key}">${INITIATIVE_DATA[key].title}</option>`
+            ).join("");
+            elInitiativeSelector.value = currentInitiativeKey;
+        }
+
+        // Theme Manager
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            if (html.classList.contains("dark")) {
+                html.classList.remove("dark");
+                localStorage.setItem("theme", "light");
+            } else {
+                html.classList.add("dark");
+                localStorage.setItem("theme", "dark");
+            }
+            lucide.createIcons();
+        }
+
+        // Apply theme preferences automatically
+        if (localStorage.getItem("theme") === "dark" || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        // Master Rendering Router
+        function renderDashboard() {
+            const data = INITIATIVE_DATA[currentInitiativeKey];
+
+            // Update top bar text & metadata metrics
+            document.getElementById("initiative-scope-badge").innerText = data.scope;
+            document.getElementById("initiative-horizon-badge").innerText = data.horizon;
+
+            // Health statuses
+            updateGlobalStatus(data.status, data.statusColor);
+
+            // Calculate overall stats dynamically from Master-Feature metrics
+            const featuresStats = getFeaturesCompletionMetrics(data.masterFeatures);
+            const total = featuresStats.total;
+            const completed = featuresStats.completed;
+            const overallPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+            // Fill top row card statistics
+            elStatProgressTxt.innerText = `${overallPercentage}%`;
+            elStatProgressBar.style.width = `${overallPercentage}%`;
+            elFeaturesRatioText.innerText = `${completed} / ${total} Features Delivered`;
+
+            elStatTimelineRange.innerText = data.timelineRange;
+            elStatTimelineTarget.innerText = data.stats.timelineTarget;
+            elStatTimelineVariance.innerText = data.stats.timelineVariance;
+
+            // Update color style of variance based on schedule status
+            if (data.stats.timelineVariance.includes("Risk") || data.stats.timelineVariance.includes("Delayed") || data.stats.timelineVariance.includes("Stalling")) {
+                elStatTimelineVariance.className = "font-semibold text-rose-500 dark:text-rose-400";
+            } else {
+                elStatTimelineVariance.className = "font-semibold text-emerald-600 dark:text-emerald-400";
+            }
+
+            // Render Dynamic components
+            renderGroupWorkloadDistribution(data.masterFeatures);
+            renderMilestonesTable(data.masterFeatures);
+            renderMatrixSwimlanes(data.masterFeatures);
+            renderRisks();
+
+            // Trigger lucide icon compilation
+            lucide.createIcons();
+        }
+
+        // Calculate direct features aggregates from loaded milestones structure
+        function getFeaturesCompletionMetrics(masterFeatures) {
+            let total = 0;
+            let completed = 0;
+            masterFeatures.forEach(mf => {
+                mf.features.forEach(f => {
+                    total++;
+                    if (f.status === "Completed") completed++;
+                });
+            });
+            return { total, completed };
+        }
+
+        // Update the header-level status pill
+        function updateGlobalStatus(status, color) {
+            let badgeClass = "hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ";
+            let pulseDotColor = "";
+
+            if (color === "emerald") {
+                badgeClass += "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60";
+                pulseDotColor = "bg-emerald-500";
+            } else if (color === "amber") {
+                badgeClass += "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/60";
+                pulseDotColor = "bg-amber-500";
+            } else {
+                badgeClass += "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/60";
+                pulseDotColor = "bg-rose-500";
+            }
+
+            elGlobalStatusBadge.className = badgeClass;
+            elGlobalStatusBadge.innerHTML = `
+                <span class="w-2 h-2 rounded-full ${pulseDotColor} relative flex pulse-dot"></span>
+                ${status}
+            `;
+        }
+
+        // Assigns a consistent color to each distinct group name from a repeating palette (groups are arbitrary Jira "Group" field values, not fixed buckets)
+        const GROUP_COLOR_PALETTE = [
+            { bar: "bg-brand-500", dot: "bg-brand-500" },
+            { bar: "bg-indigo-500", dot: "bg-indigo-500" },
+            { bar: "bg-rose-500", dot: "bg-rose-500" },
+            { bar: "bg-amber-500", dot: "bg-amber-500" },
+            { bar: "bg-emerald-500", dot: "bg-emerald-500" },
+            { bar: "bg-sky-500", dot: "bg-sky-500" },
+            { bar: "bg-fuchsia-500", dot: "bg-fuchsia-500" },
+            { bar: "bg-lime-500", dot: "bg-lime-500" }
+        ];
+
+        // Distinct set of Theme-level "Group" allocations actually present in this initiative, in first-seen order
+        function getDistinctGroups(masterFeatures) {
+            const groups = [];
+            masterFeatures.forEach(mf => {
+                mf.features.forEach(f => {
+                    if (!groups.includes(f.group)) groups.push(f.group);
+                });
+            });
+            return groups;
+        }
+
+        function groupColor(groupName, groupList) {
+            return GROUP_COLOR_PALETTE[groupList.indexOf(groupName) % GROUP_COLOR_PALETTE.length];
+        }
+
+        // Calculate workload density per execution group (derived live from each Theme's "Group" field) and render horizontal stacked bar
+        function renderGroupWorkloadDistribution(masterFeatures) {
+            const groupNames = getDistinctGroups(masterFeatures);
+            const counts = {};
+            let total = 0;
+
+            masterFeatures.forEach(mf => {
+                mf.features.forEach(f => {
+                    counts[f.group] = (counts[f.group] || 0) + 1;
+                    total++;
+                });
+            });
+
+            document.getElementById("stat-active-groups").innerText = `${groupNames.length} Group${groupNames.length === 1 ? '' : 's'}`;
+
+            const bar = document.getElementById("stat-distribution-bar");
+            bar.innerHTML = "";
+
+            if (total === 0) {
+                bar.innerHTML = `<div class="bg-slate-300 w-full h-full"></div>`;
+            } else {
+                groupNames.forEach(group => {
+                    const count = counts[group];
+                    const pct = (count / total) * 100;
+                    const color = groupColor(group, groupNames);
+                    const segment = document.createElement("div");
+                    segment.className = `${color.bar} h-full transition-all duration-300`;
+                    segment.style.width = `${pct}%`;
+                    segment.title = `${group}: ${count} Features (${Math.round(pct)}%)`;
+                    bar.appendChild(segment);
+                });
+            }
+
+            // Legend labels - one per distinct group actually found in the Theme allocation, not a fixed set
+            const legend = document.getElementById("stat-distribution-legend");
+            legend.innerHTML = groupNames.map(group => {
+                const color = groupColor(group, groupNames);
+                return `<span class="flex items-center gap-1"><span class="w-2 h-2 rounded ${color.dot}"></span> ${group} (${counts[group]})</span>`;
+            }).join("");
+        }
+
+        // Render Milestones (Master-Features) Summary table
+        function renderMilestonesTable(masterFeatures) {
+            elMilestonesTableBody.innerHTML = "";
+
+            masterFeatures.forEach(mf => {
+                // Get progress bar color directly derived from status
+                let statusBadge = "px-2 py-0.5 rounded text-[10px] font-bold inline-block ";
+                let progressColor = "bg-slate-300";
+
+                if (mf.status === "Completed") {
+                    statusBadge += "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800";
+                    progressColor = "bg-emerald-500";
+                } else if (mf.status === "In Progress") {
+                    statusBadge += "bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900";
+                    progressColor = "bg-amber-500";
+                } else if (mf.status === "Blocked") {
+                    statusBadge += "bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-450 border border-rose-200 dark:border-rose-900";
+                    progressColor = "bg-rose-500";
+                } else {
+                    statusBadge += "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700";
+                    progressColor = "bg-slate-400 dark:bg-slate-600";
+                }
+
+                const tr = document.createElement("tr");
+                tr.className = "border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors";
+                tr.innerHTML = `
+                    <td class="py-4 px-2 font-semibold text-slate-800 dark:text-slate-200 max-w-xs md:max-w-md">
+                        ${mf.name}
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <span class="${statusBadge}">${mf.status}</span>
+                    </td>
+                    <td class="py-4 px-2 font-mono text-slate-500 dark:text-slate-400 font-medium">
+                        ${mf.targetDate}
+                    </td>
+                    <td class="py-4 px-2 text-right">
+                        <div class="flex items-center justify-end gap-2.5">
+                            <span class="font-mono text-slate-700 dark:text-slate-300 font-bold">${mf.progress}%</span>
+                            <div class="w-20 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                <div class="${progressColor} h-1.5 rounded-full" style="width: ${mf.progress}%;"></div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                elMilestonesTableBody.appendChild(tr);
+            });
+        }
+
+        // --- Manually-tracked Initiative Risks ---
+        // Persisted in localStorage keyed by initiative id (not file content), so risks survive this dashboard file being
+        // regenerated with fresh Jira data as long as the initiative key and file path stay the same. Export/Import lets you
+        // carry risks across machines or if the file path/origin ever changes.
+        function risksStorageKey(key) {
+            return `pm_blueprint_risks_${key}`;
+        }
+
+        function loadRisksForCurrentInitiative() {
+            const stored = localStorage.getItem(risksStorageKey(currentInitiativeKey));
+            if (stored) {
+                try {
+                    return JSON.parse(stored);
+                } catch (e) {
+                    // Corrupted storage - fall through to seed data below
+                }
+            }
+            const seed = INITIATIVE_DATA[currentInitiativeKey].risks;
+            return Array.isArray(seed) ? seed : [];
+        }
+
+        function saveRisksForCurrentInitiative(risks) {
+            localStorage.setItem(risksStorageKey(currentInitiativeKey), JSON.stringify(risks));
+        }
+
+        function renderRisks() {
+            const risks = loadRisksForCurrentInitiative();
+            elRisksListContainer.innerHTML = "";
+
+            if (risks.length === 0) {
+                elRisksListContainer.innerHTML = `<p class="text-slate-300 dark:text-slate-700 italic text-xs text-center font-mono py-8">No risks logged yet. Click "Add Risk" to log one.</p>`;
+                return;
+            }
+
+            const severityStyles = {
+                critical: { badge: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900", dot: "bg-rose-500" },
+                warning: { badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
+                info: { badge: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400", dot: "bg-slate-400" }
+            };
+
+            risks.slice().reverse().forEach(risk => {
+                const style = severityStyles[risk.severity] || severityStyles.info;
+                const card = document.createElement("div");
+                card.className = "p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 flex flex-col gap-1.5";
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0"></span>
+                            <h5 class="font-semibold text-slate-800 dark:text-slate-100 text-xs leading-snug">${risk.title}</h5>
+                        </div>
+                        <button onclick="deleteRisk(${risk.id})" class="text-slate-300 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 flex-shrink-0">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                    ${risk.description ? `<p class="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">${risk.description}</p>` : ''}
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${style.badge}">${risk.severity}</span>
+                        <span class="text-[10px] text-slate-400 font-mono">${risk.owner ? 'Owner: ' + risk.owner : ''}</span>
+                    </div>
+                `;
+                elRisksListContainer.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        function openRiskForm() {
+            elRiskForm.classList.remove("hidden");
+            document.getElementById("risk-title-input").focus();
+        }
+
+        function closeRiskForm() {
+            elRiskForm.classList.add("hidden");
+            document.getElementById("risk-title-input").value = "";
+            document.getElementById("risk-desc-input").value = "";
+            document.getElementById("risk-owner-input").value = "";
+            document.getElementById("risk-severity-input").value = "warning";
+        }
+
+        function saveNewRisk() {
+            const title = document.getElementById("risk-title-input").value.trim();
+            if (!title) {
+                toastAlert("Please enter a risk title before saving.");
+                return;
+            }
+            const risk = {
+                id: Date.now(),
+                title: title,
+                description: document.getElementById("risk-desc-input").value.trim(),
+                severity: document.getElementById("risk-severity-input").value,
+                owner: document.getElementById("risk-owner-input").value.trim(),
+                dateAdded: new Date().toISOString()
+            };
+            const risks = loadRisksForCurrentInitiative();
+            risks.push(risk);
+            saveRisksForCurrentInitiative(risks);
+            closeRiskForm();
+            renderRisks();
+            toastAlert("Risk logged and saved locally.", "success");
+        }
+
+        function deleteRisk(id) {
+            const risks = loadRisksForCurrentInitiative().filter(r => r.id !== id);
+            saveRisksForCurrentInitiative(risks);
+            renderRisks();
+        }
+
+        // Download the current initiative's risks as a JSON file, so they can be re-imported after this dashboard is regenerated with fresh Jira data
+        function exportRisks() {
+            const risks = loadRisksForCurrentInitiative();
+            const blob = new Blob([JSON.stringify(risks, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `risks_${currentInitiativeKey}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            toastAlert(`Exported ${risks.length} risk(s) to file.`, "success");
+        }
+
+        // Import previously exported risks - use this after regenerating the dashboard to restore risks logged earlier
+        function importRisksFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (!Array.isArray(imported)) throw new Error("File must contain a JSON array of risks.");
+                    saveRisksForCurrentInitiative(imported);
+                    renderRisks();
+                    toastAlert(`Imported ${imported.length} risk(s) into this dashboard.`, "success");
+                } catch (err) {
+                    alert("Failed to import risks: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = "";
+        }
+
+        // Render primary Division/Group Allocation matrix swimlanes (columns are derived live from each Theme's "Group" field)
+        function renderMatrixSwimlanes(masterFeatures) {
+            const groupNames = getDistinctGroups(masterFeatures);
+
+            // Build the group column headers dynamically to match whatever groups actually exist in the live data
+            const headerRow = document.getElementById("matrix-header-row");
+            headerRow.innerHTML = `<th class="py-4 px-4 w-[280px] font-semibold text-slate-500 dark:text-slate-400">Master-Feature (Milestone)</th>` +
+                groupNames.map(g => `<th class="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400 text-center border-l border-slate-150 dark:border-slate-850">${g} Group</th>`).join("");
+
+            elMatrixSwimlaneBody.innerHTML = "";
+
+            // Update matrix active filter indicator
+            renderFilterIndicatorBar(masterFeatures);
+
+            masterFeatures.forEach(mf => {
+                // If filtering is enabled and this doesn't match, skip rendering it
+                if (activeMasterFeatureFilter && mf.name !== activeMasterFeatureFilter) {
+                    return;
+                }
+
+                const tr = document.createElement("tr");
+                // Class configuration with click handlers on the row to toggle filters
+                tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-all duration-200";
+
+                let cellsHtml = "";
+
+                groupNames.forEach(divName => {
+                    const matchedFeatures = mf.features.filter(f => f.group === divName);
+
+                    if (matchedFeatures.length === 0) {
+                        cellsHtml += `
+                            <td class="py-4 px-3 border-l border-slate-150 dark:border-slate-850 bg-slate-50/20 dark:bg-slate-900/10 align-top">
+                                <p class="text-slate-300 dark:text-slate-700 italic text-[10px] text-center font-mono py-6">No Allocations</p>
+                            </td>
+                        `;
+                        return;
+                    }
+
+                    // Render multiple cards if multiple features are allocated to the same group under this Master-Feature
+                    let featuresCardsHtml = "";
+                    matchedFeatures.forEach(feat => {
+                        let statusColorClass = "bg-slate-300";
+                        let borderClass = "border-slate-200 dark:border-slate-800";
+                        let textStatus = "Planned";
+                        let statusBadgeStyle = "bg-slate-100 dark:bg-slate-800 text-slate-500";
+
+                        if (feat.status === "Completed") {
+                            statusColorClass = "bg-emerald-500";
+                            borderClass = "border-emerald-100 dark:border-emerald-950";
+                            textStatus = "Completed";
+                            statusBadgeStyle = "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400";
+                        } else if (feat.status === "In Progress") {
+                            statusColorClass = "bg-amber-500";
+                            borderClass = "border-amber-100 dark:border-amber-950";
+                            textStatus = "In Progress";
+                            statusBadgeStyle = "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400";
+                        } else if (feat.status === "Blocked") {
+                            statusColorClass = "bg-rose-500";
+                            borderClass = "border-rose-200 dark:border-rose-950/60";
+                            textStatus = "Blocked";
+                            statusBadgeStyle = "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900";
+                        }
+
+                        featuresCardsHtml += `
+                            <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all">
+                                <div class="space-y-1">
+                                    <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${feat.name}</h5>
+                                </div>
+                                <div class="pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-1 mt-2">
+                                    <span class="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 dark:bg-slate-800/80 px-1 rounded">${feat.date || 'TBD'}</span>
+                                    <span class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusBadgeStyle}">${textStatus}</span>
+                                </div>
+                                <div class="mt-2 w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                                    <div class="${statusColorClass} h-1 rounded-full" style="width: ${feat.progress}%;"></div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    cellsHtml += `
+                        <td class="py-3 px-3 border-l border-slate-150 dark:border-slate-850 align-top space-y-2">
+                            ${featuresCardsHtml}
+                        </td>
+                    `;
+                });
+
+                const isFiltered = activeMasterFeatureFilter === mf.name;
+                const highlightStyle = isFiltered
+                    ? "bg-brand-50/40 dark:bg-brand-950/10 border-l-4 border-l-brand-500"
+                    : "";
+
+                tr.innerHTML = `
+                    <td class="py-4 px-4 font-semibold text-slate-800 dark:text-slate-100 text-xs align-middle leading-snug max-w-[280px] cursor-pointer group ${highlightStyle}" onclick="toggleRowFilter('${mf.name}')">
+                        <div class="space-y-1.5">
+                            <span class="text-brand-600 dark:text-brand-400 font-bold text-[10px] tracking-wider uppercase block">Master-Feature</span>
+                            <span class="hover:text-brand-500 font-bold leading-normal block transition-colors">${mf.name}</span>
+                            <div class="flex items-center gap-1.5 mt-2 font-mono text-[9px] text-slate-400 font-bold uppercase">
+                                <span class="bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200 dark:border-slate-800">Target ${mf.targetDate}</span>
+                                <span class="text-brand-500 font-bold hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Isolate row</span>
+                            </div>
+                        </div>
+                    </td>
+                    ${cellsHtml}
+                `;
+
+                elMatrixSwimlaneBody.appendChild(tr);
+            });
+        }
+
+        // Render filter description state banner
+        function renderFilterIndicatorBar() {
+            if (activeMasterFeatureFilter) {
+                elFilterBannerContainer.innerHTML = `
+                    <span class="px-2.5 py-1 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-brand-200 dark:border-brand-900">
+                        Isolating Master-Feature: <strong class="truncate max-w-[180px]">${activeMasterFeatureFilter.replace("Master-Feature: ", "")}</strong>
+                        <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-brand-500 hover:text-brand-700"><i data-lucide="x" class="w-3.5 h-3.5 inline"></i></button>
+                    </span>
+                    <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-xs text-slate-400 hover:text-slate-600 underline">Show All</button>
+                `;
+            } else {
+                elFilterBannerContainer.innerHTML = `
+                    <span class="text-slate-400 text-xs italic">All Master-Feature Swimlanes Visible</span>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        // Toggle row isolates
+        function toggleRowFilter(masterFeatureName) {
+            if (activeMasterFeatureFilter === masterFeatureName) {
+                activeMasterFeatureFilter = null; // Clear if clicked again
+            } else {
+                activeMasterFeatureFilter = masterFeatureName;
+            }
+            renderDashboard();
+            toastAlert(`Filtered Allocation matrix by row.`);
+        }
+
+        function clearMatrixFilter() {
+            activeMasterFeatureFilter = null;
+            renderDashboard();
+        }
+
+        // Switch Initiative dropdown selector state
+        function changeInitiative(key) {
+            currentInitiativeKey = key;
+            activeMasterFeatureFilter = null; // Clear active matrix isolates on initiative hop
+            elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
+            renderDashboard();
+            toastAlert(`Switched Workspace context to ${INITIATIVE_DATA[key].title}`);
+        }
+
+        // Switch main content view tabs
+        function switchTab(target) {
+            const tabSnapshot = document.getElementById("tab-snapshot");
+            const tabMatrix = document.getElementById("tab-matrix");
+            const btnSnapshot = document.getElementById("tab-snapshot-btn");
+            const btnMatrix = document.getElementById("tab-matrix-btn");
+
+            if (target === "snapshot") {
+                tabSnapshot.classList.remove("hidden");
+                tabMatrix.classList.add("hidden");
+                btnSnapshot.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
+                btnMatrix.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
+            } else {
+                tabSnapshot.classList.add("hidden");
+                tabMatrix.classList.remove("hidden");
+                btnSnapshot.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
+                btnMatrix.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
+            }
+            lucide.createIcons();
+        }
+
+        // Drawer toggle transitions
+        function toggleCSVEditor() {
+            const hasClass = elCsvDrawer.classList.contains("translate-x-full");
+            if (hasClass) {
+                elCsvDrawer.classList.remove("translate-x-full");
+            } else {
+                elCsvDrawer.classList.add("translate-x-full");
+            }
+        }
+
+        // Build a CSV representation of the current initiative's live data to pre-fill the CSV drawer
+        function buildCsvFromCurrentInitiative() {
+            const data = INITIATIVE_DATA[currentInitiativeKey];
+            const lines = ["Initiative,MasterFeature,FeatureName,GroupAllocation,PlannedFinishDate,Status,Progress"];
+            data.masterFeatures.forEach(mf => {
+                const mfLabel = mf.name.replace(/^Master-Feature:\s*/, "");
+                mf.features.forEach(f => {
+                    lines.push([currentInitiativeKey.toUpperCase(), mfLabel, f.name, f.group, f.date, f.status, f.progress].join(","));
+                });
+            });
+            return lines.join("\n");
+        }
+
+        // Parse modified CSV and update data structures
+        function saveAndApplyCSV() {
+            try {
+                const text = elCsvRawTextarea.value.trim();
+                const lines = text.split("\n");
+                if (lines.length < 2) {
+                    throw new Error("Invalid CSV structural blueprint schema. Must contain headers & data records.");
+                }
+
+                // Temporary object to hold parsed items
+                const parsedMasterFeatures = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    const parts = lines[i].split(",");
+                    if (parts.length < 6) continue;
+
+                    const rawMfName = "Master-Feature: " + parts[1].trim();
+                    const featureName = parts[2].trim();
+                    const allocationGroup = parts[3].trim();
+                    const rawDate = parts[4].trim();
+                    const rawStatus = parts[5].trim();
+                    const rawProgress = parseInt(parts[6].trim()) || 0;
+
+                    // Locate or push parent Master-Feature structure
+                    let existingMf = parsedMasterFeatures.find(mf => mf.name === rawMfName);
+                    if (!existingMf) {
+                        existingMf = {
+                            name: rawMfName,
+                            status: "In Progress", // Computed later or kept standard
+                            progress: 0,
+                            targetDate: rawDate,
+                            features: []
+                        };
+                        parsedMasterFeatures.push(existingMf);
+                    }
+
+                    // Add feature
+                    existingMf.features.push({
+                        name: featureName,
+                        group: allocationGroup,
+                        status: rawStatus,
+                        progress: rawProgress,
+                        date: rawDate
+                    });
+                }
+
+                // Compute overall master-feature milestones percentages dynamically based on features
+                parsedMasterFeatures.forEach(mf => {
+                    let totalProg = 0;
+                    let isBlocked = false;
+                    let totalFeatures = mf.features.length;
+
+                    mf.features.forEach(f => {
+                        totalProg += f.progress;
+                        if (f.status === "Blocked") isBlocked = true;
+                    });
+
+                    mf.progress = totalFeatures > 0 ? Math.round(totalProg / totalFeatures) : 0;
+
+                    if (mf.progress === 100) {
+                        mf.status = "Completed";
+                    } else if (isBlocked) {
+                        mf.status = "Blocked";
+                    } else {
+                        mf.status = "In Progress";
+                    }
+                });
+
+                // Inject into core structure & re-render
+                INITIATIVE_DATA[currentInitiativeKey].masterFeatures = parsedMasterFeatures;
+
+                // Recalculate stats counts
+                const statsRollups = getFeaturesCompletionMetrics(parsedMasterFeatures);
+                INITIATIVE_DATA[currentInitiativeKey].stats.totalFeatures = statsRollups.total;
+                INITIATIVE_DATA[currentInitiativeKey].stats.completedFeatures = statsRollups.completed;
+
+                renderDashboard();
+                toggleCSVEditor();
+                toastAlert("JIRA CSV Schema Applied Successfully!", "success");
+            } catch (err) {
+                alert("Failed to parse structural layout schema: " + err.message);
+            }
+        }
+
+        function reloadDashboard() {
+            location.reload();
+        }
+
+        // JIRA sync simulated trigger with feedback loader
+        function triggerJiraSync() {
+            const btn = document.getElementById("sync-button");
+            const icon = document.getElementById("sync-icon");
+
+            icon.classList.add("animate-spin");
+            btn.disabled = true;
+
+            toastAlert("Connecting to JIRA Cloud REST Core Engine...");
+
+            setTimeout(() => {
+                const activeData = INITIATIVE_DATA[currentInitiativeKey];
+
+                // Add tiny mock updates to show reactive sync loop changes
+                activeData.masterFeatures.forEach(mf => {
+                    mf.features.forEach(f => {
+                        if (f.status === "In Progress" && f.progress < 95) {
+                            f.progress += 10;
+                        }
+                    });
+                });
+
+                // Recalculate parent progress metrics
+                activeData.masterFeatures.forEach(mf => {
+                    let totalProg = 0;
+                    mf.features.forEach(f => totalProg += f.progress);
+                    mf.progress = mf.features.length > 0 ? Math.round(totalProg / mf.features.length) : 0;
+                    if (mf.progress === 100) mf.status = "Completed";
+                });
+
+                // Update last updated sync text
+                const now = new Date();
+                const minutes = now.getMinutes() < 10 ? '0' + now.getMinutes() : now.getMinutes();
+                const timeString = `${now.getHours()}:${minutes}`;
+                document.getElementById("last-sync-timestamp").innerText = `Today, ${timeString}`;
+
+                icon.classList.remove("animate-spin");
+                btn.disabled = false;
+
+                renderDashboard();
+                toastAlert("Successfully synced with Jira Epics & Milestones!", "success");
+            }, 1500);
+        }
+
+        // Global Toast alert component helper
+        function toastAlert(message, type = "info") {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+
+            let bgClass = "bg-slate-900 text-white border border-slate-850";
+            let iconClass = "text-brand-400";
+            let lucideName = "info";
+
+            if (type === "success") {
+                bgClass = "bg-emerald-950 text-emerald-100 border border-emerald-800";
+                iconClass = "text-emerald-400";
+                lucideName = "check-circle";
+            }
+
+            toast.className = `${bgClass} p-3.5 rounded-xl shadow-lg flex items-center gap-2.5 text-xs transition-all duration-300 transform translate-y-2 opacity-0 w-80 max-w-sm`;
+            toast.innerHTML = `
+                <i data-lucide="${lucideName}" class="w-4.5 h-4.5 ${iconClass} flex-shrink-0"></i>
+                <div class="flex-grow font-medium leading-normal">${message}</div>
+                <button class="text-slate-400 hover:text-white" onclick="this.parentElement.remove()"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            // Trigger animation frame
+            setTimeout(() => {
+                toast.classList.remove("translate-y-2", "opacity-0");
+                toast.classList.add("translate-y-0", "opacity-100");
+            }, 50);
+
+            // Exit cleanup
+            setTimeout(() => {
+                toast.classList.add("opacity-0", "translate-y-2");
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+    </script>
+</body>
+</html>

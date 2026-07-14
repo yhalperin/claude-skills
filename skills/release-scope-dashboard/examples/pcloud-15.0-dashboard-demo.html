@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Release Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d10;
+    --bg-elev:#12171b;
+    --bg-elev-2:#171e23;
+    --line: rgba(255,255,255,.09);
+    --line-soft: rgba(255,255,255,.05);
+    --text:#e9eff0;
+    --text-dim:#8b9aa1;
+    --text-faint:#57646b;
+
+    --done:#39e08a;
+    --done-dim: rgba(57,224,138,.14);
+    --progress:#ffb020;
+    --progress-dim: rgba(255,176,32,.14);
+    --todo:#5b6b76;
+    --todo-dim: rgba(91,107,118,.2);
+    --critical:#ff4d6a;
+    --critical-dim: rgba(255,77,106,.14);
+    --engineering:#4fb2ff;
+    --engineering-dim: rgba(79,178,255,.14);
+
+    --type-theme:#6fc7ff;
+    --type-theme-dim: rgba(111,199,255,.16);
+    --type-epic:#b98bff;
+    --type-epic-dim: rgba(185,139,255,.16);
+    --type-story:#3ddc84;
+    --type-story-dim: rgba(61,220,132,.16);
+    --type-bug:#ff5470;
+    --type-bug-dim: rgba(255,84,112,.16);
+
+    --font-display:'Big Shoulders Display', sans-serif;
+    --font-mono:'IBM Plex Mono', ui-monospace, monospace;
+    --font-body:'Archivo', sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(ellipse 1200px 800px at 15% -10%, rgba(255,176,32,.06), transparent 60%),
+      radial-gradient(ellipse 1000px 700px at 100% 0%, rgba(57,224,138,.05), transparent 60%),
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: auto, auto, 42px 42px, 42px 42px;
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height:100vh;
+  }
+
+  .noise{
+    position:fixed; inset:0; pointer-events:none; z-index:999; opacity:.045; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  .scan{
+    position:fixed; left:0; right:0; height:160px; z-index:998; pointer-events:none; top:-160px;
+    background: linear-gradient(to bottom, transparent, rgba(57,224,138,.055), transparent);
+    animation: scan 10s linear infinite;
+  }
+  @keyframes scan{ 0%{ top:-160px } 100%{ top:100% } }
+
+  @keyframes rise{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:translateY(0);} }
+
+  html{ scroll-behavior:smooth; }
+
+  .site-header{ position:sticky; top:0; background:rgba(10,13,16,.86); backdrop-filter: blur(8px); z-index: 50; }
+
+  .topbar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 16px 40px; border-bottom:1px solid var(--line);
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim);
+  }
+  .topbar__brand{ color:var(--text); font-weight:600; display:flex; align-items:center; gap:9px; }
+  .pulse{ width:8px; height:8px; border-radius:50%; background:var(--todo); box-shadow:0 0 0 0 rgba(255,255,255,.4); animation: pulse 2.2s ease-in-out infinite; }
+  .pulse.ok{ background:var(--done); }
+  .pulse.warn{ background:var(--progress); }
+
+  .subnav{
+    display:flex; gap:26px; align-items:center; padding:11px 40px; border-bottom:1px solid var(--line);
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    overflow-x:auto; scrollbar-width:none;
+  }
+  .subnav::-webkit-scrollbar{ display:none; }
+  .subnav a{ color:var(--text-dim); text-decoration:none; white-space:nowrap; padding:3px 1px; border-bottom:2px solid transparent; transition:.15s; }
+  .subnav a:hover{ color:var(--text); border-bottom-color:var(--progress); }
+  .subnav a i{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:8px; vertical-align:1px; }
+
+  section[id]{ scroll-margin-top:96px; }
+  @keyframes pulse{ 0%{ box-shadow:0 0 0 0 rgba(255,255,255,.18);} 70%{ box-shadow:0 0 0 8px rgba(255,255,255,0);} 100%{ box-shadow:0 0 0 0 rgba(255,255,255,0);} }
+
+  main{ max-width:1180px; margin:0 auto; padding: 48px 40px 100px; }
+
+  .hero{
+    display:grid; grid-template-columns: 1fr auto; gap:44px; align-items:center;
+    padding-bottom:40px; border-bottom:1px dashed var(--line);
+    animation: rise .6s ease both;
+  }
+  .hero__title .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:.22em; color:var(--text-faint); text-transform:uppercase; margin:0 0 10px; }
+  .hero__title h1{ font-family:var(--font-display); font-weight:800; font-size: clamp(38px,5.4vw,66px); text-transform:uppercase; letter-spacing:.01em; margin:0; line-height:.94; }
+  .phase-badge{ display:inline-flex; margin-top:18px; padding:6px 14px; border:1px solid var(--progress); color:var(--progress); font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; border-radius:2px; }
+
+  .gauge-wrap{ position:relative; width:220px; height:220px; margin:0 auto; }
+  .gauge-ticks i{ position:absolute; width:2px; height:9px; background:var(--line); left:calc(50% - 1px); top:0; transform-origin:1px 110px; }
+  .gauge-ring{ position:absolute; inset:14px; border-radius:50%; }
+  .gauge-hole{ position:absolute; inset:32px; border-radius:50%; background: var(--bg-elev); border:1px solid var(--line); display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow: inset 0 0 46px rgba(0,0,0,.55); }
+  .gauge-hole b{ font-family:var(--font-display); font-size:46px; font-weight:800; line-height:1; }
+  .gauge-hole span{ font-family:var(--font-mono); font-size:10px; letter-spacing:.22em; color:var(--text-dim); margin-top:6px; }
+
+
+  main h2{ font-family:var(--font-display); font-weight:700; font-size:25px; text-transform:uppercase; letter-spacing:.02em; margin: 58px 0 20px; display:flex; align-items:center; gap:16px; color:var(--text); }
+  main h2::after{ content:""; flex:1; height:1px; background:var(--line); }
+  main h2 small{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); letter-spacing:.1em; text-transform:none; font-weight:400; }
+
+  .highlights{ list-style:none; padding:0; margin:0; counter-reset:hl; display:grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap:14px; animation: rise .7s ease both; animation-delay:.05s; }
+  .highlight-card{ counter-increment:hl; position:relative; background:var(--bg-elev); border:1px solid var(--line); padding:16px 18px 16px 40px; font-size:13.5px; line-height:1.55; color:var(--text); }
+  .highlight-card::before{ content: counter(hl, decimal-leading-zero); position:absolute; left:14px; top:16px; font-family:var(--font-mono); font-size:11px; color:var(--progress); }
+
+  .type-grid{ display:grid; grid-template-columns: repeat(auto-fit,minmax(148px,1fr)); gap:16px; }
+  .type-card{ background:var(--bg-elev); border:1px solid var(--line); padding:20px 14px 18px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; }
+  .type-donut-wrap{ position:relative; width:86px; height:86px; }
+  .type-donut-ring{ position:absolute; inset:0; border-radius:50%; }
+  .type-donut-hole{ position:absolute; inset:11px; border-radius:50%; background:var(--bg-elev); border:1px solid var(--line); display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow: inset 0 0 20px rgba(0,0,0,.5); }
+  .type-donut-hole b{ font-family:var(--font-display); font-size:22px; font-weight:800; line-height:1; }
+  .type-card__label{ font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-dim); }
+  .type-card__breakdown{ display:flex; gap:11px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); flex-wrap:wrap; justify-content:center; }
+  .type-card__breakdown span{ display:inline-flex; align-items:center; gap:5px; }
+  .type-card__breakdown i{ width:7px; height:7px; border-radius:50%; display:inline-block; }
+
+  .categories{ display:flex; flex-direction:column; gap:38px; }
+  .category-group__head{ display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding-bottom:11px; margin-bottom:2px; border-bottom:2px solid var(--progress); }
+  .category-group__name{ font-family:var(--font-display); font-weight:700; font-size:19px; text-transform:uppercase; letter-spacing:.02em; color:var(--text); }
+  .category-group__stat{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint); white-space:nowrap; }
+  .category-group__list{ display:flex; flex-direction:column; }
+  .scope-item{ display:flex; align-items:flex-start; flex-wrap:wrap; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line-soft); font-size:13px; }
+  .category-group__list .scope-item:last-child{ border-bottom:none; }
+  .scope-item:hover{ background:var(--bg-elev); }
+  .dot{ width:7px; height:7px; border-radius:50%; margin-top:6px; flex-shrink:0; }
+  .type-badge{ display:inline-flex; align-items:center; justify-content:center; width:19px; height:19px; border-radius:4px; font-family:var(--font-mono); font-size:10px; font-weight:700; line-height:1; flex-shrink:0; }
+  .scope-item .key{ font-family:var(--font-mono); font-size:10.8px; color:var(--text-dim); flex-shrink:0; width:88px; padding-top:2px; }
+  .scope-item .title{ color:var(--text); flex:1 1 240px; min-width:200px; white-space:normal; overflow-wrap:anywhere; line-height:1.4; padding-top:1px; }
+  .scope-item .group{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); flex-shrink:0; width:150px; padding-top:2px; }
+  .status-pill{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; padding:3px 10px; border-radius:20px; white-space:nowrap; flex-shrink:0; margin-left:auto; }
+
+  .bugs__toolbar{ display:flex; gap:14px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  #bugSearch{ background:var(--bg-elev); border:1px solid var(--line); color:var(--text); padding:9px 13px; font-family:var(--font-mono); font-size:12.5px; min-width:230px; border-radius:2px; }
+  #bugSearch::placeholder{ color:var(--text-faint); }
+  .chip-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .chip{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; padding:6px 11px; border:1px solid var(--line); border-radius:20px; cursor:pointer; color:var(--text-dim); user-select:none; background:transparent; transition:.15s; }
+  .chip.active{ color:var(--bg); border-color:transparent; }
+
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); }
+  table#bugsTable{ width:100%; border-collapse:collapse; font-size:13px; min-width:640px; }
+  thead th{ text-align:left; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); padding:11px 14px; border-bottom:1px solid var(--line); cursor:pointer; white-space:nowrap; background:var(--bg-elev); }
+  thead th:hover{ color:var(--text); }
+  thead th.sorted::after{ content:" \2193"; color:var(--progress); }
+  thead th.sorted.asc::after{ content:" \2191"; }
+  tbody td{ padding:10px 14px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+  tbody tr:hover{ background:var(--bg-elev); }
+  .key-badge{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); }
+  .pri-chip, .status-chip{ font-family:var(--font-mono); font-size:9.5px; padding:2px 8px; border-radius:20px; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+  #bugEmpty{ padding:26px 14px; text-align:center; color:var(--text-faint); font-family:var(--font-mono); font-size:12px; display:none; }
+
+  footer{ margin-top:80px; padding-top:22px; border-top:1px solid var(--line); font-family:var(--font-mono); font-size:11px; color:var(--text-faint); display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  footer a{ color:var(--text-faint); }
+
+  section{ animation: rise .7s ease both; }
+
+  @media (max-width: 880px){
+    .hero{ grid-template-columns: 1fr; text-align:center; }
+    .gauge-wrap{ margin:10px auto; }
+    .bar-row{ grid-template-columns: 100px 1fr 40px; }
+    .scope-item .group{ width:auto; }
+    .status-pill{ margin-left:37px; }
+  }
+</style>
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="scan"></div>
+
+  <div class="site-header">
+    <header class="topbar">
+      <div class="topbar__brand"><span class="pulse" id="healthPulse"></span> RELEASE CONTROL</div>
+      <div id="topMeta">JQL &mdash;</div>
+    </header>
+    <nav class="subnav">
+      <a href="#top"><i style="background:var(--text-faint)"></i>Status</a>
+      <a href="#scope-by-type"><i style="background:var(--engineering)"></i>Scope by Type</a>
+      <a href="#objectives"><i style="background:var(--progress)"></i>Main Objectives</a>
+      <a href="#themes"><i style="background:var(--type-theme)"></i>Themes &amp; Initiatives</a>
+      <a href="#bugs"><i style="background:var(--critical)"></i>Bugs</a>
+    </nav>
+  </div>
+
+  <main>
+    <section class="hero" id="top">
+      <div class="hero__title">
+        <p class="eyebrow">Release Scope &amp; Status</p>
+        <h1 id="releaseName">&mdash;</h1>
+        <div class="phase-badge" id="phaseBadge" style="display:none;"></div>
+      </div>
+
+      <div class="gauge-wrap">
+        <div class="gauge-ticks" id="gaugeTicks"></div>
+        <div class="gauge-ring" id="gaugeRing"></div>
+        <div class="gauge-hole">
+          <b id="gaugePercent">0%</b>
+          <span>COMPLETE</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="type-status" id="scope-by-type">
+      <h2>Scope by Type <small id="typeTotalLabel"></small></h2>
+      <div class="type-grid" id="typeGrid"></div>
+    </section>
+
+    <section class="objectives" id="objectives">
+      <h2>Main Objectives</h2>
+      <ul class="highlights" id="highlights"></ul>
+    </section>
+
+    <section class="scope" id="themes">
+      <h2>Themes &amp; Initiatives</h2>
+      <div class="categories" id="categories"></div>
+    </section>
+
+    <section class="bugs" id="bugs">
+      <h2>Bugs <small id="bugTotalLabel"></small></h2>
+      <div class="bugs__toolbar">
+        <input id="bugSearch" placeholder="Filter by key, title or component&hellip;" />
+        <div class="chip-row" id="priorityChips"></div>
+      </div>
+      <div class="table-wrap">
+        <table id="bugsTable">
+          <thead>
+            <tr>
+              <th data-key="key">Key</th>
+              <th data-key="title">Summary</th>
+              <th data-key="component">Component</th>
+              <th data-key="priority">Priority</th>
+              <th data-key="status">Status</th>
+            </tr>
+          </thead>
+          <tbody id="bugsBody"></tbody>
+        </table>
+        <div id="bugEmpty">No bugs match the current filters.</div>
+      </div>
+    </section>
+
+    <footer>
+      <div id="jqlLine"></div>
+      <div>Generated <span id="generatedAt"></span> &middot; release-scope-dashboard</div>
+    </footer>
+  </main>
+
+<script type="application/json" id="release-data">{"release": {"name": "pCloud 15.0", "jql": "fixVersion = \"pcloud 15.0\"", "generatedAt": "2026-07-12T11:05:00+03:00", "phase": "Pre-Release Stabilization"}, "totals": {"total": 402, "done": 316, "inProgress": 34, "toDo": 52}, "byType": [{"type": "Story", "count": 290, "done": 250, "inProgress": 11, "toDo": 29}, {"type": "Test Execution", "count": 17, "done": 2, "inProgress": 2, "toDo": 13}, {"type": "Theme", "count": 23, "done": 11, "inProgress": 11, "toDo": 1}, {"type": "Task", "count": 25, "done": 16, "inProgress": 3, "toDo": 6}, {"type": "Bug", "count": 22, "done": 20, "inProgress": 2, "toDo": 0}, {"type": "Epic", "count": 21, "done": 16, "inProgress": 5, "toDo": 0}, {"type": "Test Plan", "count": 3, "done": 0, "inProgress": 0, "toDo": 3}, {"type": "Sub-task", "count": 1, "done": 1, "inProgress": 0, "toDo": 0}], "highlights": ["402 issues tracked for pCloud 15.0, 79% done (316), 8% in progress (34), 13% still to do (52).", "FIPS 140-3 compliance is essentially wrapped across Vault, PVWA and CPM; only the forward-looking FedRAMP Q2'26 and Q1'27 PVWA requirements remain in flight.", "AWS PrivateLink support shipped end-to-end for PVWA, closing out the Private Networking theme.", "Centralization into the unified Admin Portal and PVWA/PSM dark-mode rollout are the biggest active workstreams (5 of 11 items still in progress).", "CPM-to-SRS migration continues: CPM install is now blocked on SRS tenants, while Lloyds' 350K-account and account-group commitments remain in progress.", "PSM modernization is mostly done (WinSCP 6.5, .NET Core v10, Command Center, registration overhaul); only the SM page-movement testing epic is still active.", "22 bugs tracked, 20 done, concentrated in PVWA's Discovered Accounts/Incoming Requests flows and PSM session recording/monitoring, plus a PVWA REST API memory-leak fix."], "themes": [{"key": "SHLD-30566", "title": "FedRAMP Q1 27' - FedRAMP requirements for PVWA", "status": "Planned", "statusCategory": "to_do", "category": "Security & Compliance", "groups": ["EPV"]}, {"key": "SHLD-28203", "title": "FedRAMP Q2 26' - FedRAMP requirements for PVWA", "status": "In Progress", "statusCategory": "in_progress", "category": "Security & Compliance", "groups": ["EPV", "EPV pCloud"]}, {"key": "SHLD-25950", "title": "Support FIPS140-3 in Privilege Cloud - CPM", "status": "Done", "statusCategory": "done", "category": "Security & Compliance", "groups": ["EPV", "EPV pCloud"]}, {"key": "SHLD-25949", "title": "Support FIPS140-3 in Privilege Cloud - PVWA", "status": "Done", "statusCategory": "done", "category": "Security & Compliance", "groups": ["EPV", "EPV pCloud"]}, {"key": "DVP-8077", "title": "FIPS 140-3 Vault Fix", "status": "Done", "statusCategory": "done", "category": "Security & Compliance", "groups": []}, {"key": "SHLD-28145", "title": "Centralization - PVWA", "status": "In Progress", "statusCategory": "in_progress", "category": "Branding, Dark Mode & Centralization", "groups": ["DV", "EPV", "EPV pCloud", "SH H2P"]}, {"key": "JAG-38059", "title": "Centralization - Advanced Settings, Reports & Applications to Admin space", "status": "In Progress", "statusCategory": "in_progress", "category": "Branding, Dark Mode & Centralization", "groups": ["pCloud"]}, {"key": "SHLD-28141", "title": "Dark Mode Support - PVWA (July)", "status": "In Progress", "statusCategory": "in_progress", "category": "Branding, Dark Mode & Centralization", "groups": ["DV", "EPV", "EPV pCloud"]}, {"key": "SHLD-26175", "title": "Branding phase 1 - PVWA pCloud", "status": "Done", "statusCategory": "done", "category": "Branding, Dark Mode & Centralization", "groups": ["EPV", "EPV pCloud"]}, {"key": "DVP-9275", "title": "pCloud Branding phase 1 (Q1) - Priv Cloud emails (ENE) adaptations", "status": "Done", "statusCategory": "done", "category": "Branding, Dark Mode & Centralization", "groups": ["DV"]}, {"key": "SHLD-28677", "title": "Block CPM installation on SRS tenants", "status": "Done", "statusCategory": "done", "category": "SRS & CPM Migration", "groups": ["EPV pCloud"]}, {"key": "JAG-31724", "title": "Lloyds - SRS support 350K Accounts - SRS part", "status": "In Progress", "statusCategory": "in_progress", "category": "SRS & CPM Migration", "groups": ["pCloud"]}, {"key": "JAG-31722", "title": "Lloyds - Accounts Group support - SRS", "status": "In Progress", "statusCategory": "in_progress", "category": "SRS & CPM Migration", "groups": ["pCloud"]}, {"key": "JAG-29513", "title": "CPM to Secrets Rotation migration - MS2", "status": "In Progress", "statusCategory": "in_progress", "category": "SRS & CPM Migration", "groups": ["pCloud"]}, {"key": "DVP-10249", "title": "Reflect CPM activities after CPM to SRS Migration", "status": "Done", "statusCategory": "done", "category": "SRS & CPM Migration", "groups": ["DV"]}, {"key": "SHLD-28666", "title": "Support Privatelink in PVWA", "status": "Done", "statusCategory": "done", "category": "Private Networking", "groups": ["EPV pCloud"]}, {"key": "DVP-10537", "title": "Integration with Vault after removing LibSHA support", "status": "Archived", "statusCategory": "done", "category": "Vault / Core Platform Hygiene", "groups": ["SH DV"]}, {"key": "DVP-10010", "title": "Close Audit gaps between Vault and Audit service", "status": "Done", "statusCategory": "done", "category": "Vault / Core Platform Hygiene", "groups": ["DV"]}, {"key": "DVP-8905", "title": "Remove Master Key from tenant creation (Q1 26')", "status": "Done", "statusCategory": "done", "category": "Vault / Core Platform Hygiene", "groups": ["DV"]}, {"key": "DVP-7575", "title": "IRON - Apply Vault parameters in dbparm.ini without Vault restarts", "status": "In Progress", "statusCategory": "in_progress", "category": "Vault / Core Platform Hygiene", "groups": []}, {"key": "DVP-9264", "title": "Automation improvements (26-Q1/Q2)", "status": "In Progress", "statusCategory": "in_progress", "category": "Performance & Test Automation", "groups": ["DV", "SH DV"]}, {"key": "DVP-9166", "title": "Performance Testing (26-Q1/Q2)", "status": "In Progress", "statusCategory": "in_progress", "category": "Performance & Test Automation", "groups": ["DV"]}, {"key": "DVP-7235", "title": "IRON - Initial CI for Performance testing at scale", "status": "In Progress", "statusCategory": "in_progress", "category": "Performance & Test Automation", "groups": ["DV"]}], "epics": [{"key": "SHLD-28956", "title": "Colossus - Support FIPS140-3 in Privilege Cloud - PVWA", "status": "Done", "statusCategory": "done", "category": "Security & Compliance", "groups": ["EPV pCloud"]}, {"key": "SHLD-28593", "title": "CPM - Support FIPS 140-3", "status": "Done", "statusCategory": "done", "category": "Security & Compliance", "groups": ["EPV pCloud"]}, {"key": "SHLD-29307", "title": "Centralization - implementation for Manage & SetUp spaces", "status": "Done", "statusCategory": "done", "category": "Branding, Dark Mode & Centralization", "groups": ["EPV"]}, {"key": "SHLD-28620", "title": "Magnus - Automation - Centralization - 26 Q2", "status": "Done", "statusCategory": "done", "category": "Branding, Dark Mode & Centralization", "groups": ["EPV pCloud"]}, {"key": "SHLD-28609", "title": "Centralization - Reports & Applications basic flow approach", "status": "Done", "statusCategory": "done", "category": "Branding, Dark Mode & Centralization", "groups": ["EPV pCloud"]}, {"key": "SHLD-28608", "title": "Centralization - Initial prerequisites", "status": "Done", "statusCategory": "done", "category": "Branding, Dark Mode & Centralization", "groups": ["EPV pCloud"]}, {"key": "JAG-39320", "title": "pCloud - Centralization Advanced Settings, Reports & Applications to Admin space", "status": "In Progress", "statusCategory": "in_progress", "category": "Branding, Dark Mode & Centralization", "groups": ["pCloud"]}, {"key": "PCPSM-5898", "title": "[PSM 26-Q2] Dark mode for PSM Session Mgmt pages & pop-ups", "status": "In Progress", "statusCategory": "in_progress", "category": "Branding, Dark Mode & Centralization", "groups": ["Mercury"]}, {"key": "JAG-39338", "title": "SRS - LBG Account Groups - Q2-26", "status": "In Progress", "statusCategory": "in_progress", "category": "SRS & CPM Migration", "groups": ["pCloud"]}, {"key": "JAG-39323", "title": "SRS - LBG - AT&T Performance - Q2-26", "status": "In Progress", "statusCategory": "in_progress", "category": "SRS & CPM Migration", "groups": ["pCloud"]}, {"key": "JAG-39322", "title": "SRS - CPM Migration MS2 - Security", "status": "Done", "statusCategory": "done", "category": "SRS & CPM Migration", "groups": ["pCloud"]}, {"key": "DVP-10262", "title": "CPM to SRS migration - Add account ID for events from CPM", "status": "Done", "statusCategory": "done", "category": "SRS & CPM Migration", "groups": ["DV"]}, {"key": "SHLD-28744", "title": "Logan - Private Link - QA", "status": "Done", "statusCategory": "done", "category": "Private Networking", "groups": ["EPV pCloud"]}, {"key": "SHLD-26640", "title": "Colossus - Private Link - 2nd round of testing - 26 Q2", "status": "Done", "statusCategory": "done", "category": "Private Networking", "groups": ["EPV pCloud"]}, {"key": "PCPSM-6219", "title": "[PSM 26-Q2] Command Center", "status": "Done", "statusCategory": "done", "category": "PSM Modernization", "groups": ["Mercury"]}, {"key": "PCPSM-5929", "title": "[PSM 26-Q2] AS400 deprecation from installation", "status": "RollingOut", "statusCategory": "done", "category": "PSM Modernization", "groups": ["Mercury"]}, {"key": "PCPSM-5928", "title": "[PSM 26-Q2] Upgrade .NET Core to v10 (incl. new healthcheck tool)", "status": "Done", "statusCategory": "done", "category": "PSM Modernization", "groups": ["Mercury"]}, {"key": "PCPSM-5927", "title": "[PSM 26-Q2] Page movement to SM & ad-hoc pop-up - testing", "status": "In Progress", "statusCategory": "in_progress", "category": "PSM Modernization", "groups": ["Mercury"]}, {"key": "PCPSM-5923", "title": "[PSM 26-Q2] Remove Connection component from PSM installation", "status": "RollingOut", "statusCategory": "done", "category": "PSM Modernization", "groups": ["Mercury"]}, {"key": "PCPSM-5922", "title": "[PSM 26-Q2] WinSCP 6.5 upgrade", "status": "Done", "statusCategory": "done", "category": "PSM Modernization", "groups": ["Mercury"]}, {"key": "PCPSM-5906", "title": "[PSM 26-Q2] Registration Process - Installation changes", "status": "Done", "statusCategory": "done", "category": "PSM Modernization", "groups": ["Mercury"]}], "bugs": [{"key": "SHLD-30212", "title": "PVWA Native Memory Leak in REST API (Identity-JWT Auth Path)", "component": "PVWA", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "SHLD-29625", "title": "Discovered accounts view not refreshed after remove or onboard", "component": "PVWA", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "SHLD-28649", "title": "Discovered Accounts - Filters - plus dropdown doesn't work", "component": "PVWA", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "SHLD-28531", "title": "Incoming requests - table disappears after confirming or rejecting a request", "component": "PVWA", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "SHLD-28440", "title": "Edit Discovered accounts - List type mismatch in case of edit twice", "component": "PVWA", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "SHLD-28133", "title": "Navigate to scans from identity protection is broken", "component": "PVWA", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "SHLD-17818", "title": "CPM - Calling DeleteLCDAccountsMgmtCommand parallel causing an error", "component": "CPM", "priority": "Medium", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6556", "title": "Ignore the failure in the commandsSender in rotation flow", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6555", "title": "Validate UUID type in CertProvisioner", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6525", "title": "Session Recording Activities panel - date label rendered twice", "component": "PSM", "priority": "Low", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6524", "title": "Session Monitoring → Recordings list not sorted chronologically (newest-first)", "component": "PSM", "priority": "Medium", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6472", "title": "PSM WinSCP randomly fails to map through drives", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6417", "title": "PSM is unable to find CM user SID", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6408", "title": "taskhostw.exe error when running PSM 14.9 on server 2025", "component": "PSM", "priority": "High", "status": "Testing", "statusCategory": "in_progress"}, {"key": "PCPSM-6335", "title": "Certificate Authorizer accepts connections with wrong serial number", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-6088", "title": "PVWA Monitoring UI (v14.9): Player window only shows 25 records, rest are blank", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-5935", "title": "Modern HTML5GW - auto-resize feature not working", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "PCPSM-5797", "title": "Connect window: change arrow direction in Remote Machine field", "component": "PSM", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "JAG-42114", "title": "PVWA queue failed (added CE notification)", "component": "PVWA", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "JAG-42000", "title": "Create generic detail-type for failure event", "component": "SRS", "priority": "Undefined", "status": "In Progress", "statusCategory": "in_progress"}, {"key": "JAG-41584", "title": "Testing day finding 8: Sync for dependent account failed after migration", "component": "SRS", "priority": "Undefined", "status": "Done", "statusCategory": "done"}, {"key": "DVP-10886", "title": "Automated test fix: test_syslog_deploy_configure failure", "component": "Vault", "priority": "Undefined", "status": "Done", "statusCategory": "done"}]}</script>
+<script>
+(function(){
+  var raw = document.getElementById('release-data').textContent;
+  var data = {};
+  try { data = JSON.parse(raw); } catch(e) { console.error('Invalid release data JSON', e); }
+
+  var release = data.release || {};
+  var totals = data.totals || {};
+  var byType = data.byType || [];
+  var themes = data.themes || [];
+  var epics = data.epics || [];
+  var bugs = data.bugs || [];
+  var highlights = data.highlights || [];
+
+  document.title = (release.name || 'Release') + ' \u2014 Scope Dashboard';
+  document.getElementById('releaseName').textContent = release.name || 'Untitled Release';
+  document.getElementById('generatedAt').textContent = release.generatedAt || new Date().toISOString();
+  document.getElementById('jqlLine').textContent = 'JQL: ' + (release.jql || '\u2014');
+  document.getElementById('topMeta').textContent = 'JQL: ' + (release.jql || '\u2014');
+
+  if (release.phase) {
+    var pb = document.getElementById('phaseBadge');
+    pb.textContent = release.phase;
+    pb.style.display = 'inline-flex';
+  }
+
+  // ---------- Gauge ----------
+  var total = totals.total || 0;
+  var done = totals.done || 0;
+  var inProgress = totals.inProgress || 0;
+  var toDo = totals.toDo || 0;
+  var donePct = total ? (done / total * 100) : 0;
+  var progPct = total ? (inProgress / total * 100) : 0;
+  var todoPct = Math.max(0, 100 - donePct - progPct);
+
+  var ring = document.getElementById('gaugeRing');
+  ring.style.background = 'conic-gradient(var(--done) 0% ' + donePct + '%, var(--progress) ' + donePct + '% ' + (donePct+progPct) + '%, var(--todo) ' + (donePct+progPct) + '% 100%)';
+  document.getElementById('gaugePercent').textContent = Math.round(donePct) + '%';
+
+  var ticksWrap = document.getElementById('gaugeTicks');
+  for (var t=0; t<48; t++){
+    var i = document.createElement('i');
+    i.style.transform = 'rotate(' + (t*7.5) + 'deg)';
+    ticksWrap.appendChild(i);
+  }
+
+  var pulse = document.getElementById('healthPulse');
+  pulse.className = 'pulse ' + (donePct >= 90 ? 'ok' : (donePct >= 40 ? 'warn' : ''));
+
+  // ---------- Highlights ----------
+  var hlWrap = document.getElementById('highlights');
+  highlights.forEach(function(h){
+    var li = document.createElement('li');
+    li.className = 'highlight-card';
+    li.textContent = h;
+    hlWrap.appendChild(li);
+  });
+
+  // ---------- Scope by type (status donuts) ----------
+  var TYPE_DISPLAY_ORDER = ['Theme', 'Epic', 'Story / Task', 'Bug', 'Test Execution'];
+  var TYPE_HIDDEN = ['test plan', 'sub-task', 'subtask'];
+  var TYPE_MERGE = { 'story': 'Story / Task', 'task': 'Story / Task' };
+
+  var mergedTypes = {};
+  var mergedOrder = [];
+  byType.forEach(function(x){
+    var rawType = x.type || '';
+    var key = rawType.toLowerCase();
+    if (TYPE_HIDDEN.indexOf(key) > -1) return;
+    var label = TYPE_MERGE[key] || rawType;
+    if (!mergedTypes[label]) { mergedTypes[label] = { type: label, count: 0, done: 0, inProgress: 0, toDo: 0 }; mergedOrder.push(label); }
+    mergedTypes[label].count += (x.count || 0);
+    mergedTypes[label].done += (x.done || 0);
+    mergedTypes[label].inProgress += (x.inProgress || 0);
+    mergedTypes[label].toDo += (x.toDo || 0);
+  });
+
+  var sortedTypes = mergedOrder.map(function(l){ return mergedTypes[l]; }).sort(function(a,b){
+    var ia = TYPE_DISPLAY_ORDER.indexOf(a.type); if (ia === -1) ia = TYPE_DISPLAY_ORDER.length;
+    var ib = TYPE_DISPLAY_ORDER.indexOf(b.type); if (ib === -1) ib = TYPE_DISPLAY_ORDER.length;
+    if (ia !== ib) return ia - ib;
+    return (b.count || 0) - (a.count || 0);
+  });
+  var displayedTotal = sortedTypes.reduce(function(m,x){ return m + (x.count||0); }, 0);
+  document.getElementById('typeTotalLabel').textContent = '\u2014 ' + displayedTotal + ' issues across ' + sortedTypes.length + ' types';
+  var typeGridWrap = document.getElementById('typeGrid');
+  sortedTypes.forEach(function(x){
+    var tDone = x.done || 0;
+    var tProg = x.inProgress || 0;
+    var tTodo = x.toDo || 0;
+    var tTotal = x.count || (tDone + tProg + tTodo) || 0;
+    var dPct = tTotal ? (tDone / tTotal * 100) : 0;
+    var pPct = tTotal ? (tProg / tTotal * 100) : 0;
+    var card = document.createElement('div');
+    card.className = 'type-card';
+    card.innerHTML =
+      '<div class="type-donut-wrap">'+
+        '<div class="type-donut-ring" style="background:conic-gradient(var(--done) 0% '+dPct+'%, var(--progress) '+dPct+'% '+(dPct+pPct)+'%, var(--todo) '+(dPct+pPct)+'% 100%)"></div>'+
+        '<div class="type-donut-hole"><b>'+tTotal+'</b></div>'+
+      '</div>'+
+      '<div class="type-card__label">'+(x.type||'')+'</div>'+
+      '<div class="type-card__breakdown">'+
+        '<span><i style="background:var(--done)"></i>'+tDone+'</span>'+
+        '<span><i style="background:var(--progress)"></i>'+tProg+'</span>'+
+        '<span><i style="background:var(--todo)"></i>'+tTodo+'</span>'+
+      '</div>';
+    typeGridWrap.appendChild(card);
+  });
+
+  // ---------- Themes & Epics ----------
+  function statusColors(cat){
+    if (cat === 'done') return {dot:'var(--done)', bg:'var(--done-dim)', fg:'var(--done)'};
+    if (cat === 'in_progress') return {dot:'var(--progress)', bg:'var(--progress-dim)', fg:'var(--progress)'};
+    return {dot:'var(--todo)', bg:'var(--todo-dim)', fg:'var(--todo)'};
+  }
+  function typeBadge(type){
+    var t = (type||'').toLowerCase();
+    if (t === 'theme') return { letter:'T', bg:'var(--type-theme-dim)', fg:'var(--type-theme)' };
+    if (t === 'epic') return { letter:'E', bg:'var(--type-epic-dim)', fg:'var(--type-epic)' };
+    if (t === 'bug') return { letter:'B', bg:'var(--type-bug-dim)', fg:'var(--type-bug)' };
+    if (t === 'story' || t === 'task' || t === 'story / task') return { letter:'S', bg:'var(--type-story-dim)', fg:'var(--type-story)' };
+    return { letter:(type||'?').charAt(0).toUpperCase(), bg:'var(--todo-dim)', fg:'var(--todo)' };
+  }
+  themes.forEach(function(t){ if (!t.type) t.type = 'Theme'; });
+  epics.forEach(function(e){ if (!e.type) e.type = 'Epic'; });
+  var scopeItems = themes.concat(epics);
+  var byCategory = {};
+  var categoryOrder = [];
+  scopeItems.forEach(function(it){
+    var cat = it.category || 'Uncategorized';
+    if (!byCategory[cat]) { byCategory[cat] = []; categoryOrder.push(cat); }
+    byCategory[cat].push(it);
+  });
+  var catsWrap = document.getElementById('categories');
+  categoryOrder.forEach(function(cat){
+    var items = byCategory[cat];
+    var group = document.createElement('div');
+    group.className = 'category-group';
+    var doneCount = items.filter(function(i){ return i.statusCategory === 'done'; }).length;
+    var head = document.createElement('div');
+    head.className = 'category-group__head';
+    head.innerHTML = '<span class="category-group__name">'+cat+'</span><span class="category-group__stat">'+doneCount+' / '+items.length+' done</span>';
+    group.appendChild(head);
+    var list = document.createElement('div');
+    list.className = 'category-group__list';
+    items.forEach(function(it){
+      var sc = statusColors(it.statusCategory);
+      var tb = typeBadge(it.type);
+      var row = document.createElement('div');
+      row.className = 'scope-item';
+      row.innerHTML =
+        '<span class="type-badge" style="background:'+tb.bg+';color:'+tb.fg+'">'+tb.letter+'</span>'+
+        '<span class="dot" style="background:'+sc.dot+'"></span>'+
+        '<span class="key">'+(it.key||'')+'</span>'+
+        '<span class="title">'+(it.title||'')+'</span>'+
+        '<span class="group" title="'+((it.groups||[]).join(', '))+'">'+((it.groups && it.groups.length) ? it.groups.join(', ') : '\u2014')+'</span>'+
+        '<span class="status-pill" style="background:'+sc.bg+';color:'+sc.fg+'">'+(it.status||'')+'</span>';
+      list.appendChild(row);
+    });
+    group.appendChild(list);
+    catsWrap.appendChild(group);
+  });
+
+  // ---------- Bugs ----------
+  document.getElementById('bugTotalLabel').textContent = '\u2014 ' + bugs.length + ' tracked';
+  var priorityOrder = ['critical','high','medium','low','undefined'];
+  function priorityColor(p){
+    var pl = (p||'undefined').toLowerCase();
+    if (pl === 'critical' || pl === 'high') return {bg:'var(--critical-dim)', fg:'var(--critical)'};
+    if (pl === 'medium') return {bg:'var(--progress-dim)', fg:'var(--progress)'};
+    return {bg:'var(--todo-dim)', fg:'var(--todo)'};
+  }
+  function statusColor(sc){
+    if (sc === 'done') return {bg:'var(--done-dim)', fg:'var(--done)'};
+    if (sc === 'in_progress') return {bg:'var(--progress-dim)', fg:'var(--progress)'};
+    return {bg:'var(--todo-dim)', fg:'var(--todo)'};
+  }
+
+  var activePriorities = {};
+  var priorityCounts = {};
+  bugs.forEach(function(b){
+    var p = (b.priority||'Undefined');
+    var key = p.toLowerCase();
+    priorityCounts[key] = (priorityCounts[key]||0) + 1;
+  });
+  var presentPriorities = Object.keys(priorityCounts).sort(function(a,b){
+    var ia = priorityOrder.indexOf(a); if (ia===-1) ia = 99;
+    var ib = priorityOrder.indexOf(b); if (ib===-1) ib = 99;
+    return ia-ib;
+  });
+  var chipsWrap = document.getElementById('priorityChips');
+  presentPriorities.forEach(function(p){
+    var chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.textContent = p + ' (' + priorityCounts[p] + ')';
+    var col = priorityColor(p);
+    chip.addEventListener('click', function(){
+      if (activePriorities[p]) { delete activePriorities[p]; chip.classList.remove('active'); chip.style.background=''; chip.style.borderColor=''; chip.style.color=''; }
+      else { activePriorities[p] = true; chip.classList.add('active'); chip.style.background = col.fg; chip.style.color = 'var(--bg)'; chip.style.borderColor = col.fg; }
+      renderBugs();
+    });
+    chipsWrap.appendChild(chip);
+  });
+
+  var sortState = { key: 'priority', dir: 'asc' };
+  var searchInput = document.getElementById('bugSearch');
+  searchInput.addEventListener('input', renderBugs);
+
+  document.querySelectorAll('#bugsTable thead th').forEach(function(th){
+    th.addEventListener('click', function(){
+      var key = th.getAttribute('data-key');
+      if (sortState.key === key) { sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc'; }
+      else { sortState.key = key; sortState.dir = 'asc'; }
+      document.querySelectorAll('#bugsTable thead th').forEach(function(x){ x.classList.remove('sorted','asc'); });
+      th.classList.add('sorted');
+      if (sortState.dir === 'asc') th.classList.add('asc');
+      renderBugs();
+    });
+  });
+
+  function renderBugs(){
+    var q = (searchInput.value||'').toLowerCase();
+    var activeKeys = Object.keys(activePriorities);
+    var rows = bugs.filter(function(b){
+      var matchesText = !q || (b.key||'').toLowerCase().indexOf(q) > -1 || (b.title||'').toLowerCase().indexOf(q) > -1 || (b.component||'').toLowerCase().indexOf(q) > -1;
+      var matchesPriority = !activeKeys.length || activeKeys.indexOf((b.priority||'undefined').toLowerCase()) > -1;
+      return matchesText && matchesPriority;
+    });
+    rows.sort(function(a,b){
+      var av = (a[sortState.key]||''); var bv = (b[sortState.key]||'');
+      var cmp = String(av).localeCompare(String(bv));
+      return sortState.dir === 'asc' ? cmp : -cmp;
+    });
+    var body = document.getElementById('bugsBody');
+    body.innerHTML = '';
+    document.getElementById('bugEmpty').style.display = rows.length ? 'none' : 'block';
+    rows.forEach(function(b){
+      var pc = priorityColor(b.priority);
+      var sc = statusColor(b.statusCategory);
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><span class="key-badge">'+(b.key||'')+'</span></td>'+
+        '<td>'+(b.title||'')+'</td>'+
+        '<td>'+(b.component||'\u2014')+'</td>'+
+        '<td><span class="pri-chip" style="background:'+pc.bg+';color:'+pc.fg+'">'+(b.priority||'Undefined')+'</span></td>'+
+        '<td><span class="status-chip" style="background:'+sc.bg+';color:'+sc.fg+'">'+(b.status||'')+'</span></td>';
+      body.appendChild(tr);
+    });
+  }
+  renderBugs();
+})();
+</script>
+</body>
+</html>

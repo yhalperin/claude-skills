@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PI Readiness Command Center &mdash; Live (__TARGET_PI__)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            slate: {
+              950: '#0b0f19',
+              900: '#111827',
+              800: '#1f2937',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts & Lucide Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .glassmorphic {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    #division-select, #group-select {
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    #division-select option, #group-select option {
+      color: #0f172a;
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-indigo-500 selection:text-white">
+
+  <!-- Main Grid/Container -->
+  <div class="max-w-[1600px] mx-auto p-4 md:p-8 space-y-6">
+
+    <!-- Top Nav / Header -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-800/80">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider">PI __TARGET_PI__ Planning</span>
+          __SCOPE_BADGE_HTML__
+          <span class="text-xs text-slate-400 flex items-center gap-1">
+            <i data-lucide="database" class="w-3.5 h-3.5"></i> Live Jira Snapshot &middot; <strong class="text-indigo-300" id="snapshot-ts">__SNAPSHOT_TS__</strong>
+          </span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white mt-1">PI Readiness Command Center</h1>
+        <p class="text-slate-400 text-sm mt-0.5">Monitoring portfolio Themes &amp; alignment metrics for Program Increment <strong class="text-slate-200">__TARGET_PI__</strong>, sourced live from Jira (<span id="jira-project-count">__TOTAL_COUNT__</span> Themes)__SCOPE_NOTE_HTML__.</p>
+      </div>
+
+      <!-- Interactive Global Filters (Division -> Group cascade) -->
+      <div class="flex flex-wrap gap-2 items-center">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1 flex items-center gap-1">
+          <i data-lucide="filter" class="w-3.5 h-3.5 text-slate-500 ml-2"></i>
+          <select id="division-select" onchange="filterDivision(this.value)" class="bg-transparent text-xs font-medium text-slate-200 rounded-md px-2 py-1.5 focus:outline-none cursor-pointer">
+          </select>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1 flex items-center gap-1">
+          <i data-lucide="corner-down-right" class="w-3.5 h-3.5 text-slate-500 ml-2"></i>
+          <select id="group-select" onchange="filterGroup(this.value)" class="bg-transparent text-xs font-medium text-slate-200 rounded-md px-2 py-1.5 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:text-slate-600">
+          </select>
+        </div>
+        <button onclick="resetData()" class="p-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg text-slate-400 hover:text-white transition" title="Reset Division & Group Filters">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Bento Box Row 1: KPI Summary Cards -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+
+      <!-- Card 1: Combined PI Readiness Score -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
+        <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all duration-500"></div>
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">PI Readiness Index</span>
+          <span class="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg"><i data-lucide="gauge" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-extrabold text-white tracking-tight" id="readiness-score">78%</span>
+            <span class="text-xs text-emerald-400 font-medium flex items-center" id="score-status">
+              <i data-lucide="trending-up" class="w-3 h-3 mr-0.5"></i> Optimal
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">Target benchmark is &gt;60%. Weighted by theme status completeness &amp; quality flags.</p>
+        </div>
+        <div class="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+          <div id="readiness-progress-bar" class="bg-indigo-500 h-full transition-all duration-700" style="width: 78%"></div>
+        </div>
+      </div>
+
+      <!-- Card 2: Status Carry-Over Warning Indicator -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
+        <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all duration-500"></div>
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Carry-Over Themes</span>
+          <span class="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-extrabold text-amber-400 tracking-tight" id="carry-over-count">3</span>
+            <span class="text-xs text-slate-400" id="carry-over-pct">(30.0% of total)</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">Themes not yet started for this PI Planning cycle (roll over directly into __TARGET_PI__ capacity). Shown by exact Jira status.</p>
+        </div>
+        <div class="flex gap-1.5 mt-3 text-[10px] flex-wrap" id="carry-over-status-breakdown">
+        </div>
+        <div class="flex gap-1.5 mt-2 text-[10px] flex-wrap" id="carry-over-indicators">
+        </div>
+      </div>
+
+      <!-- Card 3: Target Work Items distribution -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
+        <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all duration-500"></div>
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Ready / Planned</span>
+          <span class="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg"><i data-lucide="check-circle" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-extrabold text-white tracking-tight" id="ready-planned-count">7</span>
+            <span class="text-xs text-emerald-400 font-medium" id="ready-planned-pct">70.0% Clear</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">Active backlog elements meeting requirements checklist ready for scoping.</p>
+        </div>
+        <div class="flex gap-1 mt-3" id="ready-breakdown-sub">
+          <div class="h-1 flex-1 bg-emerald-500 rounded-full" title="Ready (4)"></div>
+          <div class="h-1 flex-1 bg-emerald-500/50 rounded-full" title="Planned (3)"></div>
+          <div class="h-1 flex-1 bg-slate-800 rounded-full"></div>
+        </div>
+      </div>
+
+      <!-- Card 4: Risks Flagged -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
+        <div class="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all duration-500"></div>
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Quality Flags</span>
+          <span class="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg"><i data-lucide="shield-alert" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-extrabold text-rose-400 tracking-tight" id="flags-count">2</span>
+            <span class="text-xs text-rose-400/80 font-medium">High Risk</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">Committed themes (Ready/Planned/Carry-Over) with an unassigned owner or a flagged Jira impediment.</p>
+        </div>
+        <div class="w-full mt-3 flex items-center justify-between text-[11px]">
+          <span class="text-slate-400">Owner Missing: <strong class="text-white" id="owner-missing-count">1</strong></span>
+          <span class="text-slate-400">Flagged Themes: <strong class="text-white" id="dep-blocks-count">1</strong></span>
+        </div>
+      </div>
+
+      <!-- Card 5: Not Ready Themes -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
+        <div class="absolute top-0 right-0 w-24 h-24 bg-slate-500/5 rounded-full blur-2xl group-hover:bg-slate-500/10 transition-all duration-500"></div>
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Not Ready</span>
+          <span class="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg"><i data-lucide="circle-dashed" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-extrabold text-rose-400 tracking-tight" id="not-ready-count">0</span>
+            <span class="text-xs text-slate-400" id="not-ready-pct">(0.0% of total)</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">Not yet scoped or committed for __TARGET_PI__. Shown by exact Jira status.</p>
+        </div>
+        <div class="flex gap-1.5 mt-3 text-[10px] flex-wrap" id="not-ready-status-breakdown">
+        </div>
+        <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+          <div id="not-ready-progress-bar" class="bg-rose-500 h-full transition-all duration-700" style="width: 0%"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Bento Box Row 2: Charts -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Chart Column 1: Status Distribution Grouped (Ready vs Planned vs Carry-Over) -->
+      <div class="glassmorphic p-5 rounded-xl lg:col-span-2 flex flex-col justify-between min-h-[380px]">
+        <div>
+          <div class="flex justify-between items-start">
+            <div>
+              <h2 class="text-lg font-bold text-white tracking-tight" id="bar-chart-title">Status Distribution by Division</h2>
+              <p class="text-xs text-slate-400" id="bar-chart-subtitle">Cross-division performance. Select a Division above to drill into its Groups.</p>
+            </div>
+            <span class="text-[11px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 font-medium uppercase tracking-wider">Dynamic</span>
+          </div>
+
+          <!-- Legend (populated per actual raw Jira status present in the data) -->
+          <div class="flex flex-wrap gap-4 mt-4 text-xs" id="bar-chart-legend">
+          </div>
+        </div>
+
+        <div class="mt-6 flex-1 relative min-h-[220px]">
+          <canvas id="groupStatusBarChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart Column 2: Status Distribution Ring & PI Health Insights -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between min-h-[380px]">
+        <div>
+          <h2 class="text-lg font-bold text-white tracking-tight">Portfolio Composition</h2>
+          <p class="text-xs text-slate-400">Proportional weight of Theme states in current selection.</p>
+        </div>
+
+        <div class="flex-1 my-4 relative flex items-center justify-center max-h-[180px]">
+          <canvas id="statusDistributionRing" class="max-w-[170px]"></canvas>
+          <div class="absolute flex flex-col items-center">
+            <span class="text-2xl font-extrabold text-white" id="ring-center-stat">10</span>
+            <span class="text-[10px] uppercase tracking-widest text-slate-400">Themes</span>
+          </div>
+        </div>
+
+        <!-- Metric Table / Breakdown in side panel (one row per actual raw Jira status present) -->
+        <div class="space-y-2 text-xs" id="status-breakdown-list">
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Bento Box Row 3: Core Registry List & Insights -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Themes Table (Left 2 Columns) -->
+      <div class="glassmorphic rounded-xl overflow-hidden lg:col-span-2 flex flex-col justify-between">
+        <div class="p-5 border-b border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <h2 class="text-lg font-bold text-white tracking-tight">Active Portfolio Registry</h2>
+            <p class="text-xs text-slate-400">Tracking execution status and criteria validation checklist.</p>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <span class="text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              Type: <strong class="text-white">Theme</strong>
+            </span>
+            <span id="active-filter-chip" class="hidden text-xs bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 rounded-lg items-center gap-1.5 text-indigo-300">
+              <i data-lucide="filter" class="w-3 h-3"></i>
+              <span id="active-filter-chip-text"></span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Beautifully Crafted Minimalist Table -->
+        <div class="overflow-x-auto max-h-[640px]">
+          <table class="w-full text-left border-collapse">
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b border-slate-800/80 text-slate-400 text-xs font-semibold uppercase bg-slate-900/95">
+                <th class="p-4 pl-6">Theme Details</th>
+                <th class="p-4">Division &amp; Group</th>
+                <th class="p-4">Execution Status</th>
+                <th class="p-4">Carry Over?</th>
+                <th class="p-4 pr-6 text-right">Flags / Risk</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60 text-sm" id="themes-tbody">
+              <!-- JS Injected Rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="p-4 border-t border-slate-800/80 bg-slate-900/10 flex justify-between items-center text-xs text-slate-400">
+          <span>Showing <strong class="text-white" id="rendered-count">10</strong> out of <strong class="text-white" id="total-count">10</strong> Registered Themes</span>
+          <span class="flex items-center gap-1"><i data-lucide="external-link" class="w-3.5 h-3.5 text-indigo-400"></i> Click a Theme ID to open in Jira</span>
+        </div>
+      </div>
+
+      <!-- Live Strategic Planning Quality Insights (Right 1 Column) -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-white tracking-tight">AI &amp; Strategic Insights</h2>
+          <p class="text-xs text-slate-400">Automated structural evaluation of your current backlog status.</p>
+        </div>
+
+        <div class="space-y-3.5 flex-1 mt-4 overflow-y-auto max-h-[340px]" id="insight-panel">
+        </div>
+
+        <div class="pt-4 border-t border-slate-800 text-[11px] text-slate-500 leading-relaxed space-y-1" id="snapshot-footer">
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <script>
+    // ---------------------------------------------------------------------
+    // LIVE JIRA SNAPSHOT METADATA (embedded at generation time)
+    // ---------------------------------------------------------------------
+    const SNAPSHOT_META = {
+      fetchedAt: "__SNAPSHOT_TS__",
+      targetPI: "__TARGET_PI__",
+      jql: __JQL_JSON__,
+      totalFetched: __TOTAL_COUNT__,
+      jiraBaseUrl: "__JIRA_BASE_URL__",
+      divisionField: "customfield_22721 (Divisions)",
+      groupField: "customfield_22720 (Groups)",
+      piField: "customfield_14422 (PlannedPI)",
+      flagField: "customfield_10126 (Flagged)"
+    };
+
+    // Canonical HR Division -> Group hierarchy (source: PMO_RnD_Team_Group xls)
+    const hrTree = __HRTREE_JSON__;
+
+    const OTHER_DIVISION_LABEL = "Other / Unmapped";
+
+    // ---------------------------------------------------------------------
+    // STATUS METADATA: dashboard shows the ACTUAL raw Jira status on every
+    // theme (badges, chart legends, breakdown panels) - never a collapsed
+    // "Not Ready"/"Carry Over" label. Each raw status is only mapped to a
+    // lightweight `category` for KPI math (readiness score, Carry-Over %,
+    // Not Ready %, Quality Flags scoping). Add new raw statuses here as they
+    // appear in Jira; unknown ones fall back to a neutral slate category.
+    // ---------------------------------------------------------------------
+    const STATUS_META = {
+      "Ready for Implementation": { category: "ready", order: 0, chartColor: "#10b981", chartHoverColor: "#059669", badgeClasses: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", dotClasses: "bg-emerald-400" },
+      "Planned": { category: "planned", order: 1, chartColor: "#818cf8", chartHoverColor: "#6366f1", badgeClasses: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20", dotClasses: "bg-indigo-400" },
+      "In Progress": { category: "carryOver", order: 2, chartColor: "#f59e0b", chartHoverColor: "#d97706", badgeClasses: "bg-amber-500/10 text-amber-400 border-amber-500/20", dotClasses: "bg-amber-400" },
+      "Open": { category: "notReady", order: 3, chartColor: "#f43f5e", chartHoverColor: "#e11d48", badgeClasses: "bg-rose-500/10 text-rose-400 border-rose-500/20", dotClasses: "bg-rose-400" },
+      "HL Product Discovery": { category: "notReady", order: 4, chartColor: "#fb923c", chartHoverColor: "#f97316", badgeClasses: "bg-orange-500/10 text-orange-400 border-orange-500/20", dotClasses: "bg-orange-400" },
+      "HL Dev Discovery": { category: "notReady", order: 5, chartColor: "#e879f9", chartHoverColor: "#d946ef", badgeClasses: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20", dotClasses: "bg-fuchsia-400" }
+    };
+    const DEFAULT_STATUS_META = { category: "notReady", order: 99, chartColor: "#94a3b8", chartHoverColor: "#64748b", badgeClasses: "bg-slate-500/10 text-slate-400 border-slate-500/20", dotClasses: "bg-slate-400" };
+
+    function getStatusMeta(status) {
+      return STATUS_META[status] || DEFAULT_STATUS_META;
+    }
+    function getStatusCategory(status) {
+      return getStatusMeta(status).category;
+    }
+    // Ordered list of statuses actually present in the data (canonical order first, then any extras alphabetically)
+    function getPresentStatuses(themeList) {
+      const present = new Set(themeList.map(t => t.status));
+      return [...present].sort((a, b) => {
+        const oa = getStatusMeta(a).order, ob = getStatusMeta(b).order;
+        return oa !== ob ? oa - ob : a.localeCompare(b);
+      });
+    }
+
+    // Theme registry: real Theme issues fetched live from Jira for the target PI
+    let originalThemes = __THEMES_JSON__;
+
+    let themes = [...originalThemes];
+    let selectedDivision = 'All';
+    let selectedGroup = 'All';
+    let barChart = null;
+    let donutChart = null;
+
+    function isKnownDivision(d) {
+      return Object.prototype.hasOwnProperty.call(hrTree, d);
+    }
+
+    // Builds the Division dropdown option list: All + HR divisions present in data (sorted) + Other/Unmapped (if any)
+    function getDivisionOptions() {
+      const present = new Set();
+      originalThemes.forEach(t => t.divisions.forEach(d => present.add(d)));
+      const hrPresent = Object.keys(hrTree).filter(d => present.has(d)).sort();
+      const hasUnmapped = [...present].some(d => !isKnownDivision(d));
+      const options = ['All', ...hrPresent];
+      if (hasUnmapped) options.push(OTHER_DIVISION_LABEL);
+      return options;
+    }
+
+    function themeMatchesDivision(t, divisionName) {
+      if (divisionName === 'All') return true;
+      if (divisionName === OTHER_DIVISION_LABEL) return t.divisions.some(d => !isKnownDivision(d));
+      return t.divisions.includes(divisionName);
+    }
+
+    // Builds the Group dropdown option list for the currently selected Division: canonical HR
+    // groups (from hrTree) unioned with any live-only groups actually observed on that Division's
+    // themes, sorted. Group filtering is only meaningful once a specific Division is chosen -
+    // when Division is 'All', the Group select is disabled with a single 'All Groups' option.
+    function getGroupOptions(divisionName) {
+      if (divisionName === 'All') return ['All'];
+      const divisionThemes = originalThemes.filter(t => themeMatchesDivision(t, divisionName));
+      const canonicalGroups = (divisionName !== OTHER_DIVISION_LABEL && isKnownDivision(divisionName)) ? hrTree[divisionName] : [];
+      const liveGroups = new Set();
+      divisionThemes.forEach(t => t.groups.forEach(g => liveGroups.add(g)));
+      const groups = [...new Set([...canonicalGroups, ...liveGroups])].sort();
+      return ['All', ...groups];
+    }
+
+    function themeMatchesGroup(t, groupName) {
+      if (groupName === 'All') return true;
+      return t.groups.includes(groupName);
+    }
+
+    function populateDivisionSelect() {
+      const select = document.getElementById('division-select');
+      select.innerHTML = '';
+      getDivisionOptions().forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt;
+        el.textContent = opt === 'All' ? 'All Divisions' : opt;
+        select.appendChild(el);
+      });
+      select.value = selectedDivision;
+    }
+
+    function populateGroupSelect() {
+      const select = document.getElementById('group-select');
+      select.innerHTML = '';
+      const options = getGroupOptions(selectedDivision);
+      options.forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt;
+        el.textContent = opt === 'All' ? 'All Groups' : opt;
+        select.appendChild(el);
+      });
+      select.value = selectedGroup;
+      select.disabled = (selectedDivision === 'All');
+    }
+
+    // Calculations based on current selected filtered themes
+    function calculateMetrics() {
+      const activeThemes = themes;
+      const totalCount = activeThemes.length;
+
+      const readyCount = activeThemes.filter(t => getStatusCategory(t.status) === "ready").length;
+      const plannedCount = activeThemes.filter(t => getStatusCategory(t.status) === "planned").length;
+      const carryOverCount = activeThemes.filter(t => getStatusCategory(t.status) === "carryOver").length;
+      const notReadyCount = activeThemes.filter(t => getStatusCategory(t.status) === "notReady").length;
+
+      // Per-raw-status counts, in canonical display order, for chart legends/breakdown chips.
+      const statusCounts = {};
+      activeThemes.forEach(t => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1; });
+
+      const readyPlannedCount = readyCount + plannedCount;
+      const carryOverPct = totalCount ? Math.round((carryOverCount / totalCount) * 100) : 0;
+      const readyPlannedPct = totalCount ? Math.round((readyPlannedCount / totalCount) * 100) : 0;
+      const notReadyPct = totalCount ? Math.round((notReadyCount / totalCount) * 100) : 0;
+
+      // Quality Flag calculations: scoped to committed themes only (category ready/planned/carryOver).
+      // "Not Ready" backlog items (Open / HL Product Discovery / HL Dev Discovery) are pre-triage and
+      // expected to lack an owner, so they are not penalized for missing-owner/flag quality issues.
+      const committedThemes = activeThemes.filter(t => getStatusCategory(t.status) !== "notReady");
+      const missingOwnerCount = committedThemes.filter(t => !t.owner).length;
+      const flaggedCount = committedThemes.filter(t => t.flagged).length;
+      const totalFlags = missingOwnerCount + flaggedCount;
+
+      // Base readiness metric formulation. Not Ready themes carry zero weight (Open / HL Discovery
+      // work has not been scoped or committed yet) but still count toward the total denominator,
+      // which correctly dilutes the score as more unscoped work is discovered for the PI.
+      let baseScore = 0;
+      if (totalCount > 0) {
+        let weightedTotal = (readyCount * 1.0) + (plannedCount * 0.7) + (carryOverCount * 0.1) + (notReadyCount * 0.0);
+        let penalties = (missingOwnerCount * 0.4) + (flaggedCount * 0.5);
+        baseScore = Math.max(0, Math.min(100, Math.round(((weightedTotal - penalties) / totalCount) * 100)));
+      }
+
+      return {
+        totalCount,
+        readyCount,
+        plannedCount,
+        carryOverCount,
+        notReadyCount,
+        statusCounts,
+        readyPlannedCount,
+        carryOverPct,
+        readyPlannedPct,
+        notReadyPct,
+        missingOwnerCount,
+        flaggedCount,
+        totalFlags,
+        readinessScore: baseScore
+      };
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str == null ? '' : String(str);
+      return div.innerHTML;
+    }
+
+    // Dom Updates
+    function updateActiveFilterChip() {
+      const chip = document.getElementById('active-filter-chip');
+      const chipText = document.getElementById('active-filter-chip-text');
+      if (selectedDivision === 'All') {
+        chip.classList.add('hidden');
+        chip.classList.remove('flex');
+        return;
+      }
+      chip.classList.remove('hidden');
+      chip.classList.add('flex');
+      chipText.innerHTML = selectedGroup === 'All'
+        ? `Division: <strong class="text-white">${selectedDivision}</strong>`
+        : `Division: <strong class="text-white">${selectedDivision}</strong> &rsaquo; Group: <strong class="text-white">${selectedGroup}</strong>`;
+    }
+
+    function updateDOM() {
+      const metrics = calculateMetrics();
+      updateActiveFilterChip();
+
+      // Text Fields
+      document.getElementById('readiness-score').innerText = `${metrics.readinessScore}%`;
+      document.getElementById('readiness-progress-bar').style.width = `${metrics.readinessScore}%`;
+
+      const scoreStatusNode = document.getElementById('score-status');
+      if (metrics.readinessScore >= 60) {
+        scoreStatusNode.className = "text-xs text-emerald-400 font-medium flex items-center";
+        scoreStatusNode.innerHTML = `<i data-lucide="trending-up" class="w-3 h-3 mr-0.5"></i> Optimal`;
+      } else if (metrics.readinessScore >= 40) {
+        scoreStatusNode.className = "text-xs text-amber-400 font-medium flex items-center";
+        scoreStatusNode.innerHTML = `<i data-lucide="minus" class="w-3 h-3 mr-0.5"></i> Caution`;
+      } else {
+        scoreStatusNode.className = "text-xs text-rose-400 font-medium flex items-center";
+        scoreStatusNode.innerHTML = `<i data-lucide="alert-octagon" class="w-3 h-3 mr-0.5"></i> Critical`;
+      }
+
+      document.getElementById('carry-over-count').innerText = metrics.carryOverCount;
+      document.getElementById('carry-over-pct').innerText = `(${metrics.carryOverPct}% of total)`;
+
+      document.getElementById('ready-planned-count').innerText = metrics.readyPlannedCount;
+      document.getElementById('ready-planned-pct').innerText = `${metrics.readyPlannedPct}% Clear`;
+
+      const readyPct = metrics.totalCount ? (metrics.readyCount / metrics.totalCount) * 100 : 0;
+      const plannedPct = metrics.totalCount ? (metrics.plannedCount / metrics.totalCount) * 100 : 0;
+      const subBar = document.getElementById('ready-breakdown-sub');
+      subBar.innerHTML = `
+        <div class="h-1 flex-1 bg-emerald-500 rounded-full" title="Ready (${metrics.readyCount})"></div>
+        <div class="h-1 flex-1 bg-emerald-500/50 rounded-full" title="Planned (${metrics.plannedCount})"></div>
+        <div class="h-1 flex-1 bg-slate-800 rounded-full" title="Carry Over (${metrics.carryOverCount})"></div>
+      `;
+
+      document.getElementById('flags-count').innerText = metrics.totalFlags;
+      document.getElementById('owner-missing-count').innerText = metrics.missingOwnerCount;
+      document.getElementById('dep-blocks-count').innerText = metrics.flaggedCount;
+
+      document.getElementById('not-ready-count').innerText = metrics.notReadyCount;
+      document.getElementById('not-ready-pct').innerText = `(${metrics.notReadyPct}% of total)`;
+      document.getElementById('not-ready-progress-bar').style.width = `${metrics.notReadyPct}%`;
+
+      document.getElementById('ring-center-stat').innerText = metrics.totalCount;
+
+      document.getElementById('rendered-count').innerText = metrics.totalCount;
+      document.getElementById('total-count').innerText = originalThemes.length;
+
+      // Per-raw-status breakdown chips: reused for the bar chart legend, the donut side list,
+      // and the Not Ready / Carry-Over KPI card chip rows - one chip per exact Jira status
+      // present in the current selection (never a collapsed "Not Ready"/"Carry Over" label).
+      const presentStatuses = getPresentStatuses(themes);
+
+      const legendDiv = document.getElementById('bar-chart-legend');
+      legendDiv.innerHTML = presentStatuses.map(status => {
+        const meta = getStatusMeta(status);
+        return `<div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full ${meta.dotClasses} block"></span><span class="text-slate-300">${escapeHtml(status)}</span></div>`;
+      }).join('');
+
+      const listDiv = document.getElementById('status-breakdown-list');
+      listDiv.innerHTML = presentStatuses.map((status, idx) => {
+        const meta = getStatusMeta(status);
+        const count = metrics.statusCounts[status] || 0;
+        const borderClass = idx < presentStatuses.length - 1 ? 'border-b border-slate-800' : '';
+        return `
+          <div class="flex justify-between items-center py-1.5 ${borderClass}">
+            <span class="text-slate-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${meta.dotClasses}"></span>${escapeHtml(status)}</span>
+            <span class="font-semibold text-white">${count} Themes</span>
+          </div>`;
+      }).join('');
+
+      // Not Ready KPI card: chip per raw "notReady"-category status
+      const notReadyBreakdownDiv = document.getElementById('not-ready-status-breakdown');
+      notReadyBreakdownDiv.innerHTML = presentStatuses
+        .filter(status => getStatusCategory(status) === 'notReady')
+        .map(status => {
+          const meta = getStatusMeta(status);
+          const count = metrics.statusCounts[status] || 0;
+          return `<span class="px-2 py-0.5 rounded ${meta.badgeClasses} border font-medium">${escapeHtml(status)} (${count})</span>`;
+        }).join('');
+
+      // Carry-Over KPI card: chip per raw "carryOver"-category status
+      const carryOverBreakdownDiv = document.getElementById('carry-over-status-breakdown');
+      carryOverBreakdownDiv.innerHTML = presentStatuses
+        .filter(status => getStatusCategory(status) === 'carryOver')
+        .map(status => {
+          const meta = getStatusMeta(status);
+          const count = metrics.statusCounts[status] || 0;
+          return `<span class="px-2 py-0.5 rounded ${meta.badgeClasses} border font-medium">${escapeHtml(status)} (${count})</span>`;
+        }).join('');
+
+      // Update Carry-Over Group Pills dynamically based on filtered active set (fan-out across groups, top 6)
+      const groupCountMap = {};
+      themes.filter(t => getStatusCategory(t.status) === "carryOver").forEach(t => {
+        const relevantGroups = (selectedDivision === 'All' || selectedDivision === OTHER_DIVISION_LABEL)
+          ? t.groups
+          : t.groups; // groups already scoped since `themes` is division-filtered
+        (relevantGroups.length ? relevantGroups : ['(No Group)']).forEach(g => {
+          groupCountMap[g] = (groupCountMap[g] || 0) + 1;
+        });
+      });
+      const indicatorsDiv = document.getElementById('carry-over-indicators');
+      indicatorsDiv.innerHTML = '';
+      Object.entries(groupCountMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .forEach(([grp, count]) => {
+          indicatorsDiv.innerHTML += `
+            <span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-medium">${escapeHtml(grp)} (${count})</span>
+          `;
+        });
+
+      // Update Dynamic AI Insights List
+      const insightsPanel = document.getElementById('insight-panel');
+      let insightsHTML = '';
+
+      if (metrics.readinessScore >= 60) {
+        insightsHTML += `
+          <div class="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="check-check" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-white">Backlog Preparedness Score Optimal</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">High level of preparedness found. Current scope matches recommended limits for healthy implementation rates.</p>
+            </div>
+          </div>`;
+      } else {
+        insightsHTML += `
+          <div class="p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="alert-circle" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-amber-300">Underperforming Readiness Thresholds</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">Your score is currently at ${metrics.readinessScore}%. Optimize theme definitions, register missing owners, or reallocate carry-over buffers before scheduling commences.</p>
+            </div>
+          </div>`;
+      }
+
+      if (metrics.carryOverPct > 20) {
+        insightsHTML += `
+          <div class="p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="shuffle" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-amber-300">Heavy Carry-Over Density (${metrics.carryOverPct}%)</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">${metrics.carryOverCount} active Themes are carrying over into this PI increment. We recommend dedicating the initial sprint purely to clearing this carry-over overhead.</p>
+            </div>
+          </div>`;
+      } else {
+        insightsHTML += `
+          <div class="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="shield-check" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-emerald-300">Low Carry-Over Overhead</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">Carry-over is well below structural limits. This ensures high capacity bandwidth is clear for original, high-value strategy deployments.</p>
+            </div>
+          </div>`;
+      }
+
+      if (metrics.missingOwnerCount > 0) {
+        insightsHTML += `
+          <div class="p-3 bg-rose-500/5 border border-rose-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="user-minus" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-rose-300">Orphaned Themes Identified</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">${metrics.missingOwnerCount} Themes lack an assigned Jira owner. Risk of delayed execution scheduling during live breakout sessions is high.</p>
+            </div>
+          </div>`;
+      }
+
+      if (metrics.flaggedCount > 0) {
+        insightsHTML += `
+          <div class="p-3 bg-rose-500/5 border border-rose-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="alert-octagon" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-rose-300">Impediments Flagged in Jira</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">${metrics.flaggedCount} Theme(s) carry an active "Flagged" impediment in Jira and may need escalation before PI lock.</p>
+            </div>
+          </div>`;
+      }
+
+      insightsPanel.innerHTML = insightsHTML;
+
+      // Snapshot footer note
+      document.getElementById('snapshot-footer').innerHTML = `
+        <div class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3 h-3"></i> Snapshot fetched: <strong class="text-slate-400">${escapeHtml(SNAPSHOT_META.fetchedAt)}</strong></div>
+        <div class="flex items-start gap-1.5"><i data-lucide="terminal" class="w-3 h-3 mt-0.5 shrink-0"></i> <span class="break-all">JQL: <code class="text-slate-400">${escapeHtml(SNAPSHOT_META.jql)}</code></span></div>
+        <div class="flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3 h-3"></i> This is a static snapshot &mdash; re-run the agent to refresh data.</div>
+      `;
+
+      // Render Themes Table
+      const tableBody = document.getElementById('themes-tbody');
+      tableBody.innerHTML = '';
+
+      themes.forEach(theme => {
+        const statusMeta = getStatusMeta(theme.status);
+        const statusBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full font-medium ${statusMeta.badgeClasses} border"><span class="w-1.5 h-1.5 rounded-full ${statusMeta.dotClasses}"></span>${escapeHtml(theme.status)}</span>`;
+
+        let carryOverBadge = statusMeta.category === 'carryOver'
+          ? `<span class="text-xs text-amber-400 font-bold tracking-wide flex items-center gap-1"><i data-lucide="repeat" class="w-3.5 h-3.5"></i> Yes (Carry-Over)</span>`
+          : `<span class="text-xs text-slate-500">No</span>`;
+
+        let flagContent = '';
+        if (!theme.owner && theme.flagged) {
+          flagContent = `<span class="px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 font-medium">No Owner &amp; Flagged</span>`;
+        } else if (!theme.owner) {
+          flagContent = `<span class="px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 font-medium">No Owner</span>`;
+        } else if (theme.flagged) {
+          flagContent = `<span class="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Flagged</span>`;
+        } else {
+          flagContent = `<span class="text-slate-500 text-xs">Healthy</span>`;
+        }
+
+        const divisionsHtml = theme.divisions.map(d => escapeHtml(d)).join(', ') || '&mdash;';
+        const groupsHtml = theme.groups.map(g => escapeHtml(g)).join(', ') || '&mdash;';
+
+        tableBody.innerHTML += `
+          <tr class="hover:bg-slate-900/40 transition">
+            <td class="p-4 pl-6">
+              <div class="font-semibold text-white">${escapeHtml(theme.title)}</div>
+              <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                <a href="${escapeHtml(theme.url)}" target="_blank" rel="noopener" class="text-indigo-400 hover:text-indigo-300 hover:underline">${escapeHtml(theme.id)}</a>
+                <span class="text-slate-600">&bull;</span>
+                <span class="flex items-center gap-1"><i data-lucide="user" class="w-3 h-3 text-slate-500"></i> ${theme.owner ? escapeHtml(theme.owner) : 'Unassigned'}</span>
+              </div>
+            </td>
+            <td class="p-4">
+              <div class="text-xs text-slate-400 font-medium">${divisionsHtml}</div>
+              <div class="text-sm text-indigo-300 font-semibold">${groupsHtml}</div>
+            </td>
+            <td class="p-4">${statusBadge}</td>
+            <td class="p-4">${carryOverBadge}</td>
+            <td class="p-4 pr-6 text-right">${flagContent}</td>
+          </tr>
+        `;
+      });
+
+      lucide.createIcons();
+      updateCharts(metrics);
+    }
+
+    // Dynamic Filter handler on Division level. Changing Division always resets the Group filter,
+    // since the set of valid Groups is scoped to the newly selected Division.
+    function filterDivision(divisionName) {
+      selectedDivision = divisionName;
+      selectedGroup = 'All';
+      document.getElementById('division-select').value = divisionName;
+      populateGroupSelect();
+
+      applyFilters();
+      updateBarChartHeading();
+      updateDOM();
+    }
+
+    // Dynamic Filter handler on Group level (only enabled once a specific Division is selected).
+    function filterGroup(groupName) {
+      selectedGroup = groupName;
+      document.getElementById('group-select').value = groupName;
+
+      applyFilters();
+      updateBarChartHeading();
+      updateDOM();
+    }
+
+    function applyFilters() {
+      themes = originalThemes.filter(t => themeMatchesDivision(t, selectedDivision) && themeMatchesGroup(t, selectedGroup));
+    }
+
+    function updateBarChartHeading() {
+      const barTitle = document.getElementById('bar-chart-title');
+      const barSubtitle = document.getElementById('bar-chart-subtitle');
+      if (selectedDivision === 'All') {
+        barTitle.innerText = 'Status Distribution by Division';
+        barSubtitle.innerText = 'Cross-division performance. Select a Division above to drill into its Groups.';
+      } else if (selectedGroup === 'All') {
+        barTitle.innerText = `Status Distribution by Group \u2014 ${selectedDivision}`;
+        barSubtitle.innerText = 'Canonical HR groups shown (incl. any observed live-only groups) for the selected Division.';
+      } else {
+        barTitle.innerText = `Status Distribution by Group \u2014 ${selectedDivision}`;
+        barSubtitle.innerText = `Highlighting Group "${selectedGroup}" among its siblings. KPIs, chart & table below are scoped to this Group only.`;
+      }
+    }
+
+    function resetData() {
+      filterDivision('All');
+    }
+
+    // Chart.js Configuration & Re-Rendering Engine
+    function initCharts() {
+      const ctxBar = document.getElementById('groupStatusBarChart').getContext('2d');
+      barChart = new Chart(ctxBar, {
+        type: 'bar',
+        data: getBarChartData(),
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1f2937',
+              titleColor: '#fff',
+              bodyColor: '#cbd5e1',
+              borderColor: '#374151',
+              borderWidth: 1
+            }
+          },
+          scales: {
+            x: {
+              stacked: true,
+              grid: { color: 'rgba(255, 255, 255, 0.04)' },
+              ticks: {
+                color: (ctx) => {
+                  const label = ctx.chart.data.labels[ctx.index];
+                  return (selectedGroup !== 'All' && label === selectedGroup) ? '#f8fafc' : '#94a3b8';
+                },
+                font: (ctx) => {
+                  const label = ctx.chart.data.labels[ctx.index];
+                  return (selectedGroup !== 'All' && label === selectedGroup) ? { weight: 'bold' } : { weight: 'normal' };
+                }
+              }
+            },
+            y: {
+              stacked: true,
+              grid: { color: 'rgba(255, 255, 255, 0.04)' },
+              ticks: { color: '#94a3b8', stepSize: 1 }
+            }
+          }
+        }
+      });
+
+      const ctxDonut = document.getElementById('statusDistributionRing').getContext('2d');
+      donutChart = new Chart(ctxDonut, {
+        type: 'doughnut',
+        data: getDonutChartData(),
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '75%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1f2937',
+              titleColor: '#fff',
+              bodyColor: '#cbd5e1',
+              borderColor: '#374151',
+              borderWidth: 1
+            }
+          }
+        }
+      });
+    }
+
+    // Resolves the active labels (Divisions when 'All', or Groups scoped to the chosen Division).
+    // Each dataset/series is one ACTUAL raw Jira status present in the current selection (never a
+    // collapsed "Not Ready"/"Carry Over" label) - so the legend, stacking order and colors always
+    // reflect exactly what's in Jira, and automatically adapt if new statuses appear.
+    // The bar chart always shows the full sibling context for the selected Division (i.e. it is
+    // NOT further narrowed by the Group filter), so a selected Group can be visually compared
+    // against its peer Groups. It IS narrowed by Division. KPIs/donut/table below use `themes`,
+    // which reflects both the Division and Group filters.
+    function getBarChartData() {
+      let labels = [];
+      const divisionScopedThemes = selectedDivision === 'All' ? originalThemes : originalThemes.filter(t => themeMatchesDivision(t, selectedDivision));
+      const statuses = getPresentStatuses(divisionScopedThemes);
+      const countsByStatus = {};
+      statuses.forEach(s => countsByStatus[s] = []);
+
+      if (selectedDivision === 'All') {
+        labels = getDivisionOptions().filter(d => d !== 'All');
+        labels.forEach(divLabel => {
+          const bucket = originalThemes.filter(t => themeMatchesDivision(t, divLabel));
+          statuses.forEach(s => countsByStatus[s].push(bucket.filter(t => t.status === s).length));
+        });
+      } else {
+        const canonicalGroups = isKnownDivision(selectedDivision) ? hrTree[selectedDivision] : [];
+        const liveGroups = new Set();
+        divisionScopedThemes.forEach(t => t.groups.forEach(g => liveGroups.add(g)));
+        labels = [...new Set([...canonicalGroups, ...liveGroups])].sort();
+
+        labels.forEach(groupLabel => {
+          // A theme contributes to every one of its own groups[] entries that belongs to the selected Division
+          const bucket = divisionScopedThemes.filter(t => t.groups.includes(groupLabel));
+          statuses.forEach(s => countsByStatus[s].push(bucket.filter(t => t.status === s).length));
+        });
+      }
+
+      return {
+        labels: labels,
+        datasets: statuses.map(status => {
+          const meta = getStatusMeta(status);
+          return { label: status, data: countsByStatus[status], backgroundColor: meta.chartColor, hoverBackgroundColor: meta.chartHoverColor, borderRadius: 4 };
+        })
+      };
+    }
+
+    function getDonutChartData() {
+      const statuses = getPresentStatuses(themes);
+      const counts = statuses.map(s => themes.filter(t => t.status === s).length);
+      const colors = statuses.map(s => getStatusMeta(s).chartColor);
+
+      return {
+        labels: statuses,
+        datasets: [{
+          data: counts,
+          backgroundColor: colors,
+          borderColor: '#111827',
+          borderWidth: 3,
+          hoverOffset: 4
+        }]
+      };
+    }
+
+    function updateCharts(metrics) {
+      if (barChart && donutChart) {
+        const barData = getBarChartData();
+        barChart.data.labels = barData.labels;
+        barChart.data.datasets = barData.datasets;
+        barChart.update();
+
+        donutChart.data = getDonutChartData();
+        donutChart.update();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      populateDivisionSelect();
+      populateGroupSelect();
+      initCharts();
+      updateDOM();
+    });
+  </script>
+</body>
+</html>

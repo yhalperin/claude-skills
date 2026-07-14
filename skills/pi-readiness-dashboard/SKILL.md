@@ -1,0 +1,96 @@
+---
+name: pi-readiness-dashboard
+description: >-
+  Builds a self-contained "PI Readiness Command Center" HTML dashboard from
+  live Jira Theme issues (KPI cards, status/division bar chart, portfolio
+  composition donut, themes registry table, AI insights panel), with an
+  in-browser Division -> Group cascading drill-down filter and every raw
+  Jira status (e.g. Open, HL Product Discovery, In Progress) shown verbatim
+  throughout. Fetches Themes via the user-policy-broker MCP's jira_search
+  tool for a chosen Program Increment (PI) and an optional Division scope
+  (All Divisions or one specific division), maps PI status and HR
+  Division/Group fields, and renders a static file that opens directly in a
+  browser. Re-runnable at any point to refresh with current Jira state. Use
+  when the user asks to generate, build, run, or refresh a PI Readiness
+  dashboard/board, or wants a PI planning readiness snapshot for a specific
+  PI and/or Division.
+disable-model-invocation: true
+---
+
+# PI Readiness Dashboard
+
+Produces one self-contained HTML file - no server, no build step - visualizing Jira Theme issues for a chosen Program Increment (PI): KPI cards (Readiness Index, Carry-Over, Ready/Planned, Quality Flags, Not Ready), a status/division bar chart, a portfolio composition donut, a themes registry table, and an AI insights panel. Every status-related display (badges, chart legends, breakdown chips) shows the exact raw Jira status (e.g. `Open`, `HL Product Discovery`, `HL Dev Discovery`, `In Progress`) rather than a collapsed label. The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
+
+The rendered dashboard also ships with a client-side, in-browser Division -> Group cascading filter (separate from the fetch-time `--division` scope below): a Division dropdown and a dependent Group dropdown driven by `assets/hr_tree.json`. Selecting a Division populates the Group dropdown with that Division's canonical HR groups (plus any live-only groups observed on its Jira data); selecting a Group further narrows the KPI cards, donut, table, and insights to that Group, while the bar chart keeps showing all sibling Groups (with the selected one highlighted) for context. This requires no data changes - it works against whatever Themes were embedded at render time.
+
+## Jira instance constants (`ca-il-jira.il.cyber-ark.com`)
+
+Known field IDs for this instance - re-derive via `jira_search_fields` only if a lookup below fails or the instance differs:
+
+| Concept | Field | Notes |
+|---|---|---|
+| Divisions | `customfield_22721` | multi-select |
+| Groups | `customfield_22720` | multi-select |
+| Target PI | `customfield_14422` ("PlannedPI") | e.g. `"27-Q1"` |
+| Flagged/Impediment | `customfield_10126` | non-empty value (e.g. contains `"Impediment"`) means flagged |
+| Base URL | `https://ca-il-jira.il.cyber-ark.com:8443` | used for issue links |
+
+## Status handling
+
+The dashboard always shows the **exact, raw Jira status** on every theme - in badges, chart legends, and breakdown chips - never a collapsed label like `"Not Ready"` or `"Carry Over"`. Do not rename/merge statuses during the transform step (step 4 below); pass them through verbatim.
+
+Internally, `assets/template.html`'s `STATUS_META` classifies each raw status into one of 4 categories used only for KPI math (readiness score, Carry-Over %, Not Ready %, Quality Flags scoping) - see the table in [DATA_SCHEMA.md](DATA_SCHEMA.md#status---category-mapping-status_meta-in-assetstemplatehtml). The known statuses for this instance/project are:
+
+| Raw Jira status | Category |
+|---|---|
+| `Ready for Implementation` | ready |
+| `Planned` | planned |
+| `In Progress` | carry-over |
+| `Open`, `HL Dev Discovery`, `HL Product Discovery` | not ready |
+
+If the user's Jira project surfaces other status names, ask which category (ready/planned/carry-over/not-ready) each belongs to before fetching, then add them to `STATUS_META` in `assets/template.html` (pick a distinct Tailwind color + chart hex) - don't guess, and don't just lump unknowns into an existing bucket's display label (they'll still render safely via the neutral fallback if left unmapped).
+
+## Workflow
+
+1. **Confirm scope.** Ask only what's genuinely ambiguous:
+   - **Target PI** (the `customfield_14422` value, e.g. `"27-Q1"`). If unsure it's valid, check via `jira_get_field_options` for that field on a Theme issue/project before fetching.
+   - **Division scope**: `"All"` (default) or one specific canonical division name. Canonical divisions are the keys of [assets/hr_tree.json](assets/hr_tree.json) - list them as options if asking.
+
+2. **Build the JQL.**
+   ```
+   issuetype = Theme AND cf[22721] is not EMPTY AND cf[14422] = "<PI>"
+   AND status in ("Ready for Implementation", "Planned", "In Progress",
+                   "Open", "HL Dev Discovery", "HL Product Discovery")
+   ORDER BY key
+   ```
+   If Division scope is not `"All"`, append: `AND cf[22721] = "<Division>"`.
+
+3. **Fetch from Jira**, via the `user-policy-broker` MCP's `jira_search` (never bypass the broker):
+   - Fields: `key,summary,status,assignee,customfield_22721,customfield_22720,customfield_10126`.
+   - **Paginate at `limit=25`** (`start_at` 0, 25, 50, ...) - larger limits (50/100) truncate tool output on this instance even with minimal fields.
+   - After each page, immediately write the raw results to a simplified JSON file (`key,title,status,owner,divisions,groups,flagged`) in a scratch build directory - don't hold everything in context, and this survives truncation/retries.
+   - Decode HTML entities in title/divisions/groups (`&amp;` -> `&`) as you transform each page.
+   - Stop when `start_at + max_results >= total`.
+
+4. **Transform and assemble** into the schema in [DATA_SCHEMA.md](DATA_SCHEMA.md): `status` = the raw Jira status name, unchanged, `owner` = assignee display name or `null` if `"Unassigned"`, `flagged` = boolean from the impediment field, `url` = `<base_url>/browse/<key>`. Merge all pages into one JSON array file, e.g. `themes.json`. Verify count: `len(array) == total` reported by the first `jira_search` call, and no duplicate `id`s.
+
+5. **HR tree.** Use the bundled [assets/hr_tree.json](assets/hr_tree.json) as-is (canonical Division -> Group hierarchy). Only regenerate it if the user provides a new HR org-chart export; otherwise never re-derive it per run. Divisions present in Jira but missing from this tree are handled automatically by the template (bucketed as "Other / Unmapped") - don't treat that as an error.
+
+6. **Render.** Write the exact JQL from step 2 to a small text file first (e.g. `jql.txt`) and pass it via `--jql-file` - on Windows/PowerShell, passing the JQL directly via `--jql` is unreliable because the embedded double quotes get mangled by shell/CRT argument parsing.
+   ```bash
+   python scripts/render_dashboard.py --themes themes.json --pi "27-Q1" --division "All" --jql-file jql.txt
+   ```
+   Pass the exact `--division` value from step 1 (e.g. `"Secrets Manager"`) when scoped, matching a key in `hr_tree.json`. Add `--out <path>` to control the filename, or `--no-open` to skip auto-opening. This writes a stable filename derived from PI + division (e.g. `pi_readiness_27-q1_all.html`) next to the themes file.
+
+7. **Report a fetch summary**: PI, Division scope, total Themes fetched, per-raw-status counts, and the output path. Mention that Division and Group can be further drilled into live in the browser (top-right dropdowns) without re-running anything - that filtering works against whatever Themes were embedded at render time.
+
+## Re-running for a refresh
+
+Same PI/Division scope, repeat steps 2-6 with fresh data. Each combination of PI + Division produces a stable filename, so regenerating overwrites the same file rather than accumulating new ones - confirm with the user before reusing vs. producing a new dated copy. Only re-run to pull newer Jira data or change the fetch-time PI/Division scope - the in-browser Division/Group filter and raw-status display need no re-run, they're already live in any previously rendered file.
+
+## Additional resources
+
+- Exact JSON shape and field semantics: [DATA_SCHEMA.md](DATA_SCHEMA.md)
+- Dashboard markup/styling (edit only for structural bugs - preserve the design): [assets/template.html](assets/template.html)
+- Canonical Division -> Group hierarchy: [assets/hr_tree.json](assets/hr_tree.json)
+- Example themes data file for reference: [examples/sample_themes.json](examples/sample_themes.json)
