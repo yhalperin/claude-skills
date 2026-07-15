@@ -103,18 +103,23 @@
         <span class="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0" id="timeline-today-badge"></span>
       </div>
 
-      <!-- Proportional phase bar with a small "Today" marker -->
-      <div class="relative mt-2.5 mb-1">
+      <!-- Proportional phase bar with a small "Today" marker. Wrapped together with the
+           phase chip row in one relative container so the today-line can span both and the
+           chip cells can be sized with the SAME per-phase width % as the bar segments -
+           guaranteeing each chip lines up directly under the segment it describes. -->
+      <div class="relative mt-2.5" id="timeline-track-wrap">
         <div class="flex w-full h-1.5 rounded-full overflow-hidden gap-0.5" id="timeline-segments">
         </div>
-        <div class="absolute -top-[3px] flex flex-col items-center transition-all duration-700 group" id="timeline-today-marker" style="left: 0%; transform: translateX(-50%);">
+        <div class="absolute -top-[3px] flex flex-col items-center transition-all duration-700 group z-10" id="timeline-today-marker" style="left: 0%; transform: translateX(-50%);">
           <div class="w-2 h-2 rounded-full bg-white ring-2 ring-slate-950"></div>
-          <span class="absolute top-3 text-[9px] font-semibold text-slate-400 whitespace-nowrap">Today</span>
+          <span class="absolute top-3 text-[9px] font-semibold text-slate-300 whitespace-nowrap">Today</span>
         </div>
-      </div>
+        <!-- Vertical guide line tying the "Today" dot to the exact phase chip below it -->
+        <div class="absolute top-0 w-px bg-white/25 pointer-events-none transition-all duration-700" id="timeline-today-line" style="left: 0%; height: 0px;"></div>
 
-      <!-- Compact inline phase chips -->
-      <div class="flex flex-wrap items-center gap-1.5 mt-4" id="timeline-phase-cards">
+        <!-- Phase chips - each cell's width mirrors its segment above, so position = correlation -->
+        <div class="flex flex-nowrap items-start w-full mt-4 pt-1.5 overflow-x-auto" id="timeline-phase-cards">
+        </div>
       </div>
     </section>
 
@@ -495,20 +500,24 @@
     // ---------------------------------------------------------------------
     // PI TIMELINE: renders the Pre-Planning/Planning/Execution/Retrospective
     // phase bar at the head of the board for PI_TIMELINE (already scoped to
-    // just the target PI at render time). Segment widths are proportional to
-    // each phase's real day count, with a readability floor so short phases
-    // (e.g. a 1-week Planning phase) don't collapse to an invisible sliver.
-    // The "Today" marker's position is computed against those SAME adjusted
-    // widths so it lines up with the segment it's visually inside.
+    // just the target PI at render time). Segment widths are STRICTLY
+    // proportional to each phase's real day count (no readability floor) so
+    // the bar always correlates 1:1 with actual elapsed/remaining time - a
+    // 1-week Planning phase is visibly ~4x thinner than a 4-week Retrospective,
+    // etc. The "Today" marker's position is computed against those SAME
+    // true-proportional widths so it lines up exactly with its segment.
     // ---------------------------------------------------------------------
     const PI_PHASE_ORDER = ['prePlanning', 'planning', 'execution', 'retrospective'];
+    // Each phase keeps its OWN hue at every stage (dimmed if completed, ghost outline if
+    // upcoming, full brightness + pulse if current) so segment boundaries in the bar are
+    // always visible - not just wherever "current" happens to be - and that same hue is
+    // echoed on its chip below so the two are unmistakably the same phase.
     const PI_PHASE_META = {
-      prePlanning: { label: 'Pre-Planning', icon: 'search' },
-      planning: { label: 'Planning', icon: 'calendar-check-2' },
-      execution: { label: 'Execution', icon: 'rocket' },
-      retrospective: { label: 'Retrospective', icon: 'flag' }
+      prePlanning: { label: 'Pre-Planning', icon: 'search', hue: 'violet' },
+      planning: { label: 'Planning', icon: 'calendar-check-2', hue: 'amber' },
+      execution: { label: 'Execution', icon: 'rocket', hue: 'blue' },
+      retrospective: { label: 'Retrospective', icon: 'flag', hue: 'emerald' }
     };
-    const PI_TIMELINE_MIN_SEGMENT_PCT = 8;
 
     function parseDateOnly(str) {
       const [y, m, d] = str.split('-').map(Number);
@@ -536,14 +545,11 @@
         .filter(key => PI_TIMELINE.phases[key])
         .map(key => {
           const p = PI_TIMELINE.phases[key];
-          return { key, label: PI_PHASE_META[key].label, icon: PI_PHASE_META[key].icon, start: p.start, end: p.end, days: daysInclusive(p.start, p.end) };
+          return { key, label: PI_PHASE_META[key].label, icon: PI_PHASE_META[key].icon, hue: PI_PHASE_META[key].hue, start: p.start, end: p.end, days: daysInclusive(p.start, p.end) };
         });
 
       const totalDays = phases.reduce((sum, p) => sum + p.days, 0);
-      const rawPct = phases.map(p => (p.days / totalDays) * 100);
-      const adjustedPct = rawPct.map(pct => Math.max(pct, PI_TIMELINE_MIN_SEGMENT_PCT));
-      const adjustedSum = adjustedPct.reduce((a, b) => a + b, 0);
-      const widths = adjustedPct.map(pct => (pct / adjustedSum) * 100);
+      const widths = phases.map(p => (p.days / totalDays) * 100);
 
       let cumulative = 0;
       let todayPct = null;
@@ -574,53 +580,78 @@
       document.getElementById('timeline-subtitle').innerText =
         `${formatDateShort(PI_TIMELINE.start)} \u2013 ${formatDateShort(PI_TIMELINE.end)} \u00b7 ${PI_TIMELINE.sprints} Sprints`;
 
+      const activeHue = activePhaseKey ? PI_PHASE_META[activePhaseKey].hue : null;
       const activeLabel = activePhaseKey
         ? PI_PHASE_META[activePhaseKey].label
         : (today < parseDateOnly(phases[0].start) ? 'Not Started' : 'Completed');
       const badge = document.getElementById('timeline-today-badge');
       badge.textContent = activePhaseKey ? `Now In: ${activeLabel}` : activeLabel;
       badge.className = 'text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full border shrink-0 ' +
-        (activePhaseKey ? 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20' : 'text-slate-400 bg-slate-800 border-slate-700');
+        (activeHue ? `text-${activeHue}-300 bg-${activeHue}-500/10 border-${activeHue}-500/20` : 'text-slate-400 bg-slate-800 border-slate-700');
 
+      // Bar segment fill: each phase keeps ITS OWN hue throughout (full/bright = current,
+      // solid/muted = completed, faint outline-only = upcoming) so every boundary in the bar
+      // is a visible color change, not just a single current-vs-rest split.
       const segmentsDiv = document.getElementById('timeline-segments');
       segmentsDiv.innerHTML = phases.map(p => {
-        const colorClass = p.status === 'current' ? 'bg-indigo-500' : p.status === 'completed' ? 'bg-slate-600' : 'bg-slate-800';
+        const colorClass = p.status === 'current' ? `bg-${p.hue}-500`
+          : p.status === 'completed' ? `bg-${p.hue}-800/70`
+          : `bg-${p.hue}-500/15`;
         const pulseClass = p.status === 'current' ? 'animate-pulse' : '';
         return `<div class="h-full ${colorClass} ${pulseClass}" style="width: ${p.widthPct}%" title="${escapeHtml(p.label)}: ${formatDateShort(p.start)} \u2013 ${formatDateShort(p.end)}"></div>`;
       }).join('');
 
       document.getElementById('timeline-today-marker').style.left = `${todayPct}%`;
 
+      // "Today" guide line: spans from the dot straight down through the chip row below, so
+      // it's unambiguous which phase chip today falls under even at a glance.
+      const todayLine = document.getElementById('timeline-today-line');
+      todayLine.style.left = `${todayPct}%`;
+      requestAnimationFrame(() => {
+        const wrap = document.getElementById('timeline-track-wrap');
+        todayLine.style.height = `${wrap.offsetHeight}px`;
+      });
+
       const midPiStr = PI_TIMELINE.midPIPlanningDate ? formatDateShort(PI_TIMELINE.midPIPlanningDate) : null;
 
+      // Phase chips: each cell's flex-basis mirrors its segment's widthPct above, so the chip
+      // is positioned directly under the segment it describes - the actual fix for
+      // "the box below doesn't correlate with the bar above". Narrow phases (e.g. a 1-week
+      // Planning phase) get a min-width floor + a compact (dateless) chip so their label is
+      // never clipped or forced to overlap a neighboring chip; the full date range is still
+      // available via the tooltip.
       const cardsDiv = document.getElementById('timeline-phase-cards');
       cardsDiv.innerHTML = phases.map(p => {
         const end = parseDateOnly(p.end);
         const daysLeft = Math.round((end - today) / 86400000);
+        const compact = p.widthPct < 10;
 
         let chipClasses, statusFragment;
         if (p.status === 'completed') {
-          chipClasses = 'border-slate-800 bg-slate-900/30 text-slate-500';
-          statusFragment = `<i data-lucide="check" class="w-3 h-3 text-slate-500"></i>`;
+          chipClasses = `border-${p.hue}-800/50 bg-${p.hue}-950/20 text-${p.hue}-300/70`;
+          statusFragment = `<i data-lucide="check" class="w-3 h-3 text-${p.hue}-400/70"></i>`;
         } else if (p.status === 'current') {
-          chipClasses = 'border-indigo-500/40 bg-indigo-500/10 text-indigo-200 ring-1 ring-indigo-500/20';
+          chipClasses = `border-${p.hue}-500/50 bg-${p.hue}-500/10 text-${p.hue}-200 ring-1 ring-${p.hue}-500/20`;
           const daysLabel = daysLeft <= 0 ? 'Ends today' : (daysLeft === 1 ? '1 day left' : `${daysLeft} days left`);
-          statusFragment = `<span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span><span class="font-bold text-indigo-300">${daysLabel}</span>`;
+          statusFragment = `<span class="w-1.5 h-1.5 rounded-full bg-${p.hue}-400 animate-pulse shrink-0"></span><span class="font-bold text-${p.hue}-300 whitespace-nowrap">${daysLabel}</span>`;
         } else {
-          chipClasses = 'border-slate-800/60 bg-slate-900/20 text-slate-500';
-          statusFragment = `<i data-lucide="circle" class="w-2.5 h-2.5 text-slate-600"></i>`;
+          chipClasses = `border-${p.hue}-900/40 bg-${p.hue}-500/5 text-${p.hue}-400/60`;
+          statusFragment = `<i data-lucide="circle" class="w-2.5 h-2.5 text-${p.hue}-500/50"></i>`;
         }
 
-        const midPiNote = (p.key === 'execution' && midPiStr)
-          ? `<span class="text-slate-600">&bull;</span><span class="flex items-center gap-1 text-amber-400/70"><i data-lucide="flag" class="w-2.5 h-2.5"></i>Mid-PI ${midPiStr}</span>`
+        const midPiNote = (p.key === 'execution' && midPiStr && !compact)
+          ? `<span class="text-slate-600">&bull;</span><span class="flex items-center gap-1 text-amber-400/70 whitespace-nowrap"><i data-lucide="flag" class="w-2.5 h-2.5"></i>Mid-PI ${midPiStr}</span>`
           : '';
+        const dateFragment = compact ? '' : `<span class="opacity-70 whitespace-nowrap">${formatDateShort(p.start)}&ndash;${formatDateShort(p.end)}</span>`;
 
         return `
-          <div class="flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-[10px] ${chipClasses}" title="${escapeHtml(p.label)}: ${formatDateShort(p.start)} \u2013 ${formatDateShort(p.end)}">
-            ${statusFragment}
-            <span class="font-semibold">${escapeHtml(p.label)}</span>
-            <span class="opacity-70">${formatDateShort(p.start)}&ndash;${formatDateShort(p.end)}</span>
-            ${midPiNote}
+          <div class="shrink pl-2" style="flex: 0 1 ${p.widthPct}%; min-width: ${compact ? 74 : 150}px;">
+            <div class="flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-[10px] border-l-2 ${chipClasses} w-fit max-w-full overflow-hidden" title="${escapeHtml(p.label)}: ${formatDateShort(p.start)} \u2013 ${formatDateShort(p.end)}">
+              ${statusFragment}
+              <span class="font-semibold whitespace-nowrap">${escapeHtml(p.label)}</span>
+              ${dateFragment}
+              ${midPiNote}
+            </div>
           </div>`;
       }).join('');
 
