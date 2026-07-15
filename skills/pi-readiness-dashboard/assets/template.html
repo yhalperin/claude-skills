@@ -40,11 +40,11 @@
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    #division-select, #group-select {
+    #division-select, #group-select, #throughput-select {
       appearance: none;
       -webkit-appearance: none;
     }
-    #division-select option, #group-select option {
+    #division-select option, #group-select option, #throughput-select option {
       color: #0f172a;
       background: #ffffff;
     }
@@ -81,11 +81,42 @@
           <select id="group-select" onchange="filterGroup(this.value)" class="bg-transparent text-xs font-medium text-slate-200 rounded-md px-2 py-1.5 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:text-slate-600">
           </select>
         </div>
-        <button onclick="resetData()" class="p-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg text-slate-400 hover:text-white transition" title="Reset Division & Group Filters">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1 flex items-center gap-1">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-500 ml-2"></i>
+          <select id="throughput-select" onchange="filterThroughputType(this.value)" class="bg-transparent text-xs font-medium text-slate-200 rounded-md px-2 py-1.5 focus:outline-none cursor-pointer">
+          </select>
+        </div>
+        <button onclick="resetData()" class="p-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg text-slate-400 hover:text-white transition" title="Reset All Filters">
           <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
         </button>
       </div>
     </header>
+
+    <!-- PI Timeline (head of board, compact strip) - only rendered if timeline data for this PI was supplied -->
+    <section class="glassmorphic px-4 py-3 rounded-xl" id="pi-timeline-section" style="display:none;">
+      <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div class="flex items-baseline gap-2 min-w-0">
+          <h2 class="text-xs font-bold text-white tracking-tight uppercase tracking-wider shrink-0">PI Timeline</h2>
+          <span class="text-xs font-semibold text-slate-300 shrink-0" id="timeline-pi-name">__TARGET_PI__</span>
+          <span class="text-[11px] text-slate-500 truncate" id="timeline-subtitle"></span>
+        </div>
+        <span class="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0" id="timeline-today-badge"></span>
+      </div>
+
+      <!-- Proportional phase bar with a small "Today" marker -->
+      <div class="relative mt-2.5 mb-1">
+        <div class="flex w-full h-1.5 rounded-full overflow-hidden gap-0.5" id="timeline-segments">
+        </div>
+        <div class="absolute -top-[3px] flex flex-col items-center transition-all duration-700 group" id="timeline-today-marker" style="left: 0%; transform: translateX(-50%);">
+          <div class="w-2 h-2 rounded-full bg-white ring-2 ring-slate-950"></div>
+          <span class="absolute top-3 text-[9px] font-semibold text-slate-400 whitespace-nowrap">Today</span>
+        </div>
+      </div>
+
+      <!-- Compact inline phase chips -->
+      <div class="flex flex-wrap items-center gap-1.5 mt-4" id="timeline-phase-cards">
+      </div>
+    </section>
 
     <!-- Bento Box Row 1: KPI Summary Cards -->
     <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -104,23 +135,42 @@
               <i data-lucide="trending-up" class="w-3 h-3 mr-0.5"></i> Optimal
             </span>
           </div>
-          <p class="text-[11px] text-slate-400 mt-2">Target benchmark is &gt;60%. Weighted by theme status completeness &amp; quality flags.</p>
+          <p class="text-[11px] text-slate-400 mt-2">Target benchmark is &gt;60%.</p>
+          <p class="text-[11px] text-slate-500 mt-1" id="readiness-formula-desc"></p>
         </div>
         <div class="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
           <div id="readiness-progress-bar" class="bg-indigo-500 h-full transition-all duration-700" style="width: 78%"></div>
         </div>
       </div>
 
-      <!-- Card 2: Status Carry-Over Warning Indicator -->
+      <!-- Card 2: Net New Scope -->
       <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
-        <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all duration-500"></div>
+        <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all duration-500"></div>
         <div class="flex justify-between items-start">
-          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Carry-Over Themes</span>
-          <span class="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Net New Scope</span>
+          <span class="p-1.5 bg-cyan-500/10 text-cyan-400 rounded-lg"><i data-lucide="sparkles" class="w-4 h-4"></i></span>
         </div>
         <div class="mt-4">
           <div class="flex items-baseline gap-2">
-            <span class="text-4xl font-extrabold text-amber-400 tracking-tight" id="carry-over-count">3</span>
+            <span class="text-4xl font-extrabold text-cyan-400 tracking-tight" id="net-new-count">7</span>
+            <span class="text-xs text-slate-400" id="net-new-pct">(70.0% of total)</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">All Themes NOT already "In Progress" - the actual new scope being planned for __TARGET_PI__. Shown by exact Jira status.</p>
+        </div>
+        <div class="flex gap-1.5 mt-3 text-[10px] flex-wrap" id="net-new-status-breakdown">
+        </div>
+      </div>
+
+      <!-- Card 3: Status Carry-Over Warning Indicator -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
+        <div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all duration-500"></div>
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Carry-Over Themes</span>
+          <span class="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-extrabold text-blue-400 tracking-tight" id="carry-over-count">3</span>
             <span class="text-xs text-slate-400" id="carry-over-pct">(30.0% of total)</span>
           </div>
           <p class="text-[11px] text-slate-400 mt-2">Themes not yet started for this PI Planning cycle (roll over directly into __TARGET_PI__ capacity). Shown by exact Jira status.</p>
@@ -131,7 +181,7 @@
         </div>
       </div>
 
-      <!-- Card 3: Target Work Items distribution -->
+      <!-- Card 4: Target Work Items distribution -->
       <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
         <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all duration-500"></div>
         <div class="flex justify-between items-start">
@@ -147,28 +197,8 @@
         </div>
         <div class="flex gap-1 mt-3" id="ready-breakdown-sub">
           <div class="h-1 flex-1 bg-emerald-500 rounded-full" title="Ready (4)"></div>
-          <div class="h-1 flex-1 bg-emerald-500/50 rounded-full" title="Planned (3)"></div>
-          <div class="h-1 flex-1 bg-slate-800 rounded-full"></div>
-        </div>
-      </div>
-
-      <!-- Card 4: Risks Flagged -->
-      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between relative overflow-hidden group">
-        <div class="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all duration-500"></div>
-        <div class="flex justify-between items-start">
-          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Quality Flags</span>
-          <span class="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg"><i data-lucide="shield-alert" class="w-4 h-4"></i></span>
-        </div>
-        <div class="mt-4">
-          <div class="flex items-baseline gap-2">
-            <span class="text-4xl font-extrabold text-rose-400 tracking-tight" id="flags-count">2</span>
-            <span class="text-xs text-rose-400/80 font-medium">High Risk</span>
-          </div>
-          <p class="text-[11px] text-slate-400 mt-2">Committed themes (Ready/Planned/Carry-Over) with an unassigned owner or a flagged Jira impediment.</p>
-        </div>
-        <div class="w-full mt-3 flex items-center justify-between text-[11px]">
-          <span class="text-slate-400">Owner Missing: <strong class="text-white" id="owner-missing-count">1</strong></span>
-          <span class="text-slate-400">Flagged Themes: <strong class="text-white" id="dep-blocks-count">1</strong></span>
+          <div class="h-1 flex-1 bg-teal-400 rounded-full" title="Planned (3)"></div>
+          <div class="h-1 flex-1 bg-blue-500/40 rounded-full"></div>
         </div>
       </div>
 
@@ -177,11 +207,11 @@
         <div class="absolute top-0 right-0 w-24 h-24 bg-slate-500/5 rounded-full blur-2xl group-hover:bg-slate-500/10 transition-all duration-500"></div>
         <div class="flex justify-between items-start">
           <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Not Ready</span>
-          <span class="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg"><i data-lucide="circle-dashed" class="w-4 h-4"></i></span>
+          <span class="p-1.5 bg-slate-500/10 text-slate-300 rounded-lg"><i data-lucide="circle-dashed" class="w-4 h-4"></i></span>
         </div>
         <div class="mt-4">
           <div class="flex items-baseline gap-2">
-            <span class="text-4xl font-extrabold text-rose-400 tracking-tight" id="not-ready-count">0</span>
+            <span class="text-4xl font-extrabold text-slate-300 tracking-tight" id="not-ready-count">0</span>
             <span class="text-xs text-slate-400" id="not-ready-pct">(0.0% of total)</span>
           </div>
           <p class="text-[11px] text-slate-400 mt-2">Not yet scoped or committed for __TARGET_PI__. Shown by exact Jira status.</p>
@@ -189,13 +219,30 @@
         <div class="flex gap-1.5 mt-3 text-[10px] flex-wrap" id="not-ready-status-breakdown">
         </div>
         <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-          <div id="not-ready-progress-bar" class="bg-rose-500 h-full transition-all duration-700" style="width: 0%"></div>
+          <div id="not-ready-progress-bar" class="bg-slate-400 h-full transition-all duration-700" style="width: 0%"></div>
         </div>
       </div>
 
     </section>
 
-    <!-- Bento Box Row 2: Charts -->
+    <!-- Bento Box Row 2: AI & Strategic Insights (full-width band) -->
+    <section class="glassmorphic p-5 rounded-xl">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white tracking-tight">AI &amp; Strategic Insights</h2>
+          <p class="text-xs text-slate-400">Automated structural evaluation of your current backlog status.</p>
+        </div>
+        <span class="text-[11px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 font-medium uppercase tracking-wider shrink-0">Live</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="insight-panel">
+      </div>
+
+      <div class="pt-4 mt-4 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-[11px] text-slate-500 leading-relaxed" id="snapshot-footer">
+      </div>
+    </section>
+
+    <!-- Bento Box Row 3: Charts -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
       <!-- Chart Column 1: Status Distribution Grouped (Ready vs Planned vs Carry-Over) -->
@@ -241,11 +288,82 @@
 
     </section>
 
-    <!-- Bento Box Row 3: Core Registry List & Insights -->
+    <!-- Bento Box Row 4: Ownership Responsibility Matrix (Net New Scope only) -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-      <!-- Themes Table (Left 2 Columns) -->
-      <div class="glassmorphic rounded-xl overflow-hidden lg:col-span-2 flex flex-col justify-between">
+      <!-- Counters + Description -->
+      <div class="glassmorphic p-5 rounded-xl lg:col-span-2 flex flex-col justify-between min-h-[220px]">
+        <div class="flex justify-between items-start">
+          <div>
+            <h2 class="text-lg font-bold text-white tracking-tight">Ownership Responsibility Matrix</h2>
+            <p class="text-xs text-slate-400">Who owns each Theme right now, scoped to <strong class="text-slate-300">Net New Scope only</strong> (excludes "In Progress" carry-over, which is already committed R&amp;D execution).</p>
+          </div>
+          <span class="text-[11px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 font-medium uppercase tracking-wider shrink-0">Net New</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mt-5">
+          <div class="p-4 rounded-lg bg-fuchsia-500/5 border border-fuchsia-500/10">
+            <div class="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <span class="w-2 h-2 rounded-full bg-fuchsia-400"></span> Product Management
+            </div>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span class="text-3xl font-extrabold text-fuchsia-400 tracking-tight" id="pm-count">0</span>
+              <span class="text-xs text-slate-400" id="pm-pct">(0% of Net New)</span>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-1">Owns: Open, HL Product Discovery</p>
+          </div>
+          <div class="p-4 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
+            <div class="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span> R&amp;D
+            </div>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span class="text-3xl font-extrabold text-cyan-400 tracking-tight" id="rnd-count">0</span>
+              <span class="text-xs text-slate-400" id="rnd-pct">(0% of Net New)</span>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-1">Owns: Planned, Ready for Implementation, HL Dev Discovery</p>
+          </div>
+        </div>
+
+        <div class="flex w-full h-2 rounded-full overflow-hidden mt-4 bg-slate-800" id="ownership-split-bar">
+          <div class="h-full bg-fuchsia-400 transition-all duration-700" id="ownership-split-pm-bar" style="width: 0%"></div>
+          <div class="h-full bg-cyan-400 transition-all duration-700" id="ownership-split-rnd-bar" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Ownership Split Donut -->
+      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between min-h-[220px]">
+        <div>
+          <h2 class="text-lg font-bold text-white tracking-tight">Ownership Split</h2>
+          <p class="text-xs text-slate-400">Product Management vs R&amp;D, Net New Scope.</p>
+        </div>
+
+        <div class="flex-1 my-3 relative flex items-center justify-center max-h-[140px]">
+          <canvas id="ownershipDonut" class="max-w-[130px]"></canvas>
+          <div class="absolute flex flex-col items-center">
+            <span class="text-xl font-extrabold text-white" id="ownership-center-stat">0</span>
+            <span class="text-[9px] uppercase tracking-widest text-slate-400">Net New</span>
+          </div>
+        </div>
+
+        <div class="space-y-1.5 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-fuchsia-400"></span>Product Management</span>
+            <span class="font-semibold text-white" id="ownership-legend-pm">0 Themes</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-cyan-400"></span>R&amp;D</span>
+            <span class="font-semibold text-white" id="ownership-legend-rnd">0 Themes</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Bento Box Row 5: Core Registry List -->
+    <section class="grid grid-cols-1 gap-6">
+
+      <!-- Themes Table (Full Width) -->
+      <div class="glassmorphic rounded-xl overflow-hidden flex flex-col justify-between">
         <div class="p-5 border-b border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
             <h2 class="text-lg font-bold text-white tracking-tight">Active Portfolio Registry</h2>
@@ -255,6 +373,10 @@
             <span class="text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300">
               <span class="w-2 h-2 rounded-full bg-slate-400"></span>
               Type: <strong class="text-white">Theme</strong>
+            </span>
+            <span class="text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300">
+              <i data-lucide="layers" class="w-3 h-3"></i>
+              Throughput: <strong class="text-white" id="throughput-chip-text"></strong>
             </span>
             <span id="active-filter-chip" class="hidden text-xs bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 rounded-lg items-center gap-1.5 text-indigo-300">
               <i data-lucide="filter" class="w-3 h-3"></i>
@@ -287,20 +409,6 @@
         </div>
       </div>
 
-      <!-- Live Strategic Planning Quality Insights (Right 1 Column) -->
-      <div class="glassmorphic p-5 rounded-xl flex flex-col justify-between space-y-4">
-        <div>
-          <h2 class="text-lg font-bold text-white tracking-tight">AI &amp; Strategic Insights</h2>
-          <p class="text-xs text-slate-400">Automated structural evaluation of your current backlog status.</p>
-        </div>
-
-        <div class="space-y-3.5 flex-1 mt-4 overflow-y-auto max-h-[340px]" id="insight-panel">
-        </div>
-
-        <div class="pt-4 border-t border-slate-800 text-[11px] text-slate-500 leading-relaxed space-y-1" id="snapshot-footer">
-        </div>
-      </div>
-
     </section>
 
   </div>
@@ -324,6 +432,11 @@
     // Canonical HR Division -> Group hierarchy (source: PMO_RnD_Team_Group xls)
     const hrTree = __HRTREE_JSON__;
 
+    // PI Timeline (Pre-Planning/Planning/Execution/Retrospective phase dates) for the target PI
+    // only, sourced from a fiscal-year timeline export. null if not supplied/found at render time
+    // - the timeline section then stays hidden rather than showing stale or wrong dates.
+    const PI_TIMELINE = __PI_TIMELINE_JSON__;
+
     const OTHER_DIVISION_LABEL = "Other / Unmapped";
 
     // ---------------------------------------------------------------------
@@ -334,21 +447,184 @@
     // Not Ready %, Quality Flags scoping). Add new raw statuses here as they
     // appear in Jira; unknown ones fall back to a neutral slate category.
     // ---------------------------------------------------------------------
+    // Palette reflects real-world status meaning: green = done/ready, teal = scheduled,
+    // blue = actively being worked (In Progress), slate = untriaged backlog (Open), warm
+    // amber/violet = the two discovery/analysis sub-stages that precede triage.
     const STATUS_META = {
       "Ready for Implementation": { category: "ready", order: 0, chartColor: "#10b981", chartHoverColor: "#059669", badgeClasses: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", dotClasses: "bg-emerald-400" },
-      "Planned": { category: "planned", order: 1, chartColor: "#818cf8", chartHoverColor: "#6366f1", badgeClasses: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20", dotClasses: "bg-indigo-400" },
-      "In Progress": { category: "carryOver", order: 2, chartColor: "#f59e0b", chartHoverColor: "#d97706", badgeClasses: "bg-amber-500/10 text-amber-400 border-amber-500/20", dotClasses: "bg-amber-400" },
-      "Open": { category: "notReady", order: 3, chartColor: "#f43f5e", chartHoverColor: "#e11d48", badgeClasses: "bg-rose-500/10 text-rose-400 border-rose-500/20", dotClasses: "bg-rose-400" },
-      "HL Product Discovery": { category: "notReady", order: 4, chartColor: "#fb923c", chartHoverColor: "#f97316", badgeClasses: "bg-orange-500/10 text-orange-400 border-orange-500/20", dotClasses: "bg-orange-400" },
-      "HL Dev Discovery": { category: "notReady", order: 5, chartColor: "#e879f9", chartHoverColor: "#d946ef", badgeClasses: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20", dotClasses: "bg-fuchsia-400" }
+      "Planned": { category: "planned", order: 1, chartColor: "#2dd4bf", chartHoverColor: "#14b8a6", badgeClasses: "bg-teal-500/10 text-teal-400 border-teal-500/20", dotClasses: "bg-teal-400" },
+      "In Progress": { category: "carryOver", order: 2, chartColor: "#3b82f6", chartHoverColor: "#2563eb", badgeClasses: "bg-blue-500/10 text-blue-400 border-blue-500/20", dotClasses: "bg-blue-400" },
+      "Open": { category: "notReady", order: 3, chartColor: "#94a3b8", chartHoverColor: "#64748b", badgeClasses: "bg-slate-500/10 text-slate-300 border-slate-500/20", dotClasses: "bg-slate-400" },
+      "HL Product Discovery": { category: "notReady", order: 4, chartColor: "#f59e0b", chartHoverColor: "#d97706", badgeClasses: "bg-amber-500/10 text-amber-400 border-amber-500/20", dotClasses: "bg-amber-400" },
+      "HL Dev Discovery": { category: "notReady", order: 5, chartColor: "#a78bfa", chartHoverColor: "#8b5cf6", badgeClasses: "bg-violet-500/10 text-violet-400 border-violet-500/20", dotClasses: "bg-violet-400" }
     };
-    const DEFAULT_STATUS_META = { category: "notReady", order: 99, chartColor: "#94a3b8", chartHoverColor: "#64748b", badgeClasses: "bg-slate-500/10 text-slate-400 border-slate-500/20", dotClasses: "bg-slate-400" };
+    const DEFAULT_STATUS_META = { category: "notReady", order: 99, chartColor: "#6b7280", chartHoverColor: "#4b5563", badgeClasses: "bg-gray-500/10 text-gray-400 border-gray-500/20", dotClasses: "bg-gray-400" };
 
     function getStatusMeta(status) {
       return STATUS_META[status] || DEFAULT_STATUS_META;
     }
     function getStatusCategory(status) {
       return getStatusMeta(status).category;
+    }
+
+    // ---------------------------------------------------------------------
+    // OWNERSHIP RESPONSIBILITY MATRIX: maps each raw status to the function
+    // that owns it right now. Only meaningful for "Net New" Themes (i.e.
+    // excluding "In Progress"/carry-over, which is already committed R&D
+    // execution, not a live ownership question) - callers should filter to
+    // non-carryOver themes before using this for KPI/chart math.
+    // ---------------------------------------------------------------------
+    const OWNER_PRODUCT_MGMT = "Product Management";
+    const OWNER_RND = "R&D";
+    const OWNERSHIP_META = {
+      "Open": OWNER_PRODUCT_MGMT,
+      "HL Product Discovery": OWNER_PRODUCT_MGMT,
+      "HL Dev Discovery": OWNER_RND,
+      "Planned": OWNER_RND,
+      "Ready for Implementation": OWNER_RND,
+      "In Progress": OWNER_RND
+    };
+    const OWNERSHIP_COLORS = {
+      [OWNER_PRODUCT_MGMT]: { chartColor: "#e879f9", chartHoverColor: "#d946ef", badgeClasses: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20", dotClasses: "bg-fuchsia-400" },
+      [OWNER_RND]: { chartColor: "#22d3ee", chartHoverColor: "#06b6d4", badgeClasses: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20", dotClasses: "bg-cyan-400" }
+    };
+    function getOwnerGroup(status) {
+      return OWNERSHIP_META[status] || OWNER_RND;
+    }
+
+    // ---------------------------------------------------------------------
+    // PI TIMELINE: renders the Pre-Planning/Planning/Execution/Retrospective
+    // phase bar at the head of the board for PI_TIMELINE (already scoped to
+    // just the target PI at render time). Segment widths are proportional to
+    // each phase's real day count, with a readability floor so short phases
+    // (e.g. a 1-week Planning phase) don't collapse to an invisible sliver.
+    // The "Today" marker's position is computed against those SAME adjusted
+    // widths so it lines up with the segment it's visually inside.
+    // ---------------------------------------------------------------------
+    const PI_PHASE_ORDER = ['prePlanning', 'planning', 'execution', 'retrospective'];
+    const PI_PHASE_META = {
+      prePlanning: { label: 'Pre-Planning', icon: 'search' },
+      planning: { label: 'Planning', icon: 'calendar-check-2' },
+      execution: { label: 'Execution', icon: 'rocket' },
+      retrospective: { label: 'Retrospective', icon: 'flag' }
+    };
+    const PI_TIMELINE_MIN_SEGMENT_PCT = 8;
+
+    function parseDateOnly(str) {
+      const [y, m, d] = str.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    function formatDateShort(str) {
+      return parseDateOnly(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    function daysInclusive(startStr, endStr) {
+      return Math.round((parseDateOnly(endStr) - parseDateOnly(startStr)) / 86400000) + 1;
+    }
+
+    function renderPiTimeline() {
+      const section = document.getElementById('pi-timeline-section');
+      if (!PI_TIMELINE || !PI_TIMELINE.phases) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = '';
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const phases = PI_PHASE_ORDER
+        .filter(key => PI_TIMELINE.phases[key])
+        .map(key => {
+          const p = PI_TIMELINE.phases[key];
+          return { key, label: PI_PHASE_META[key].label, icon: PI_PHASE_META[key].icon, start: p.start, end: p.end, days: daysInclusive(p.start, p.end) };
+        });
+
+      const totalDays = phases.reduce((sum, p) => sum + p.days, 0);
+      const rawPct = phases.map(p => (p.days / totalDays) * 100);
+      const adjustedPct = rawPct.map(pct => Math.max(pct, PI_TIMELINE_MIN_SEGMENT_PCT));
+      const adjustedSum = adjustedPct.reduce((a, b) => a + b, 0);
+      const widths = adjustedPct.map(pct => (pct / adjustedSum) * 100);
+
+      let cumulative = 0;
+      let todayPct = null;
+      let activePhaseKey = null;
+
+      phases.forEach((p, i) => {
+        const start = parseDateOnly(p.start);
+        const end = parseDateOnly(p.end);
+        if (today < start) {
+          p.status = 'upcoming';
+        } else if (today > end) {
+          p.status = 'completed';
+        } else {
+          p.status = 'current';
+          activePhaseKey = p.key;
+          const frac = Math.min(1, Math.max(0, (today - start) / (end - start || 1)));
+          todayPct = cumulative + frac * widths[i];
+        }
+        p.widthPct = widths[i];
+        cumulative += widths[i];
+      });
+
+      if (todayPct === null) {
+        todayPct = today < parseDateOnly(phases[0].start) ? 0 : 100;
+      }
+
+      document.getElementById('timeline-pi-name').innerText = PI_TIMELINE.name;
+      document.getElementById('timeline-subtitle').innerText =
+        `${formatDateShort(PI_TIMELINE.start)} \u2013 ${formatDateShort(PI_TIMELINE.end)} \u00b7 ${PI_TIMELINE.sprints} Sprints`;
+
+      const activeLabel = activePhaseKey
+        ? PI_PHASE_META[activePhaseKey].label
+        : (today < parseDateOnly(phases[0].start) ? 'Not Started' : 'Completed');
+      const badge = document.getElementById('timeline-today-badge');
+      badge.textContent = activePhaseKey ? `Now In: ${activeLabel}` : activeLabel;
+      badge.className = 'text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full border shrink-0 ' +
+        (activePhaseKey ? 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20' : 'text-slate-400 bg-slate-800 border-slate-700');
+
+      const segmentsDiv = document.getElementById('timeline-segments');
+      segmentsDiv.innerHTML = phases.map(p => {
+        const colorClass = p.status === 'current' ? 'bg-indigo-500' : p.status === 'completed' ? 'bg-slate-600' : 'bg-slate-800';
+        const pulseClass = p.status === 'current' ? 'animate-pulse' : '';
+        return `<div class="h-full ${colorClass} ${pulseClass}" style="width: ${p.widthPct}%" title="${escapeHtml(p.label)}: ${formatDateShort(p.start)} \u2013 ${formatDateShort(p.end)}"></div>`;
+      }).join('');
+
+      document.getElementById('timeline-today-marker').style.left = `${todayPct}%`;
+
+      const midPiStr = PI_TIMELINE.midPIPlanningDate ? formatDateShort(PI_TIMELINE.midPIPlanningDate) : null;
+
+      const cardsDiv = document.getElementById('timeline-phase-cards');
+      cardsDiv.innerHTML = phases.map(p => {
+        const end = parseDateOnly(p.end);
+        const daysLeft = Math.round((end - today) / 86400000);
+
+        let chipClasses, statusFragment;
+        if (p.status === 'completed') {
+          chipClasses = 'border-slate-800 bg-slate-900/30 text-slate-500';
+          statusFragment = `<i data-lucide="check" class="w-3 h-3 text-slate-500"></i>`;
+        } else if (p.status === 'current') {
+          chipClasses = 'border-indigo-500/40 bg-indigo-500/10 text-indigo-200 ring-1 ring-indigo-500/20';
+          const daysLabel = daysLeft <= 0 ? 'Ends today' : (daysLeft === 1 ? '1 day left' : `${daysLeft} days left`);
+          statusFragment = `<span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span><span class="font-bold text-indigo-300">${daysLabel}</span>`;
+        } else {
+          chipClasses = 'border-slate-800/60 bg-slate-900/20 text-slate-500';
+          statusFragment = `<i data-lucide="circle" class="w-2.5 h-2.5 text-slate-600"></i>`;
+        }
+
+        const midPiNote = (p.key === 'execution' && midPiStr)
+          ? `<span class="text-slate-600">&bull;</span><span class="flex items-center gap-1 text-amber-400/70"><i data-lucide="flag" class="w-2.5 h-2.5"></i>Mid-PI ${midPiStr}</span>`
+          : '';
+
+        return `
+          <div class="flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-[10px] ${chipClasses}" title="${escapeHtml(p.label)}: ${formatDateShort(p.start)} \u2013 ${formatDateShort(p.end)}">
+            ${statusFragment}
+            <span class="font-semibold">${escapeHtml(p.label)}</span>
+            <span class="opacity-70">${formatDateShort(p.start)}&ndash;${formatDateShort(p.end)}</span>
+            ${midPiNote}
+          </div>`;
+      }).join('');
+
+      lucide.createIcons();
     }
     // Ordered list of statuses actually present in the data (canonical order first, then any extras alphabetically)
     function getPresentStatuses(themeList) {
@@ -367,15 +643,55 @@
     let selectedGroup = 'All';
     let barChart = null;
     let donutChart = null;
+    let ownershipChart = null;
+
+    // Throughput Type (customfield_13920) filter. Distinct from Division/Group: it scopes the
+    // entire universe of Themes under consideration *before* Division/Group are applied, so
+    // switching it also changes which Divisions/Groups even appear as options. Defaults to
+    // "A. Feature + Empty" per business rule (Feature-only Themes are what PI Planning tracks;
+    // Tech/Security/Support throughput items are out of scope by default but can be surfaced).
+    const THROUGHPUT_DEFAULT = '__FEATURE_OR_EMPTY__';
+    const THROUGHPUT_ALL = 'All';
+    const THROUGHPUT_EMPTY_ONLY = '__EMPTY_ONLY__';
+    let selectedThroughputType = THROUGHPUT_DEFAULT;
+
+    function throughputTypeLabel(value) {
+      if (value === THROUGHPUT_DEFAULT) return 'A. Feature + Empty (Default)';
+      if (value === THROUGHPUT_ALL) return 'All Types';
+      if (value === THROUGHPUT_EMPTY_ONLY) return 'Empty / Unset only';
+      return value;
+    }
+
+    function getThroughputTypeOptions() {
+      const present = new Set();
+      originalThemes.forEach(t => { if (t.throughputType) present.add(t.throughputType); });
+      const distinctValues = [...present].sort();
+      return [THROUGHPUT_DEFAULT, THROUGHPUT_ALL, ...distinctValues, THROUGHPUT_EMPTY_ONLY];
+    }
+
+    function themeMatchesThroughputType(t, selection) {
+      if (selection === THROUGHPUT_ALL) return true;
+      if (selection === THROUGHPUT_DEFAULT) return !t.throughputType || t.throughputType === 'A. Feature';
+      if (selection === THROUGHPUT_EMPTY_ONLY) return !t.throughputType;
+      return t.throughputType === selection;
+    }
+
+    // The base universe of Themes after applying only the Throughput Type scope - Division/Group
+    // options and filtering are computed relative to this, not the full originalThemes.
+    function getThroughputScopedThemes() {
+      return originalThemes.filter(t => themeMatchesThroughputType(t, selectedThroughputType));
+    }
 
     function isKnownDivision(d) {
       return Object.prototype.hasOwnProperty.call(hrTree, d);
     }
 
-    // Builds the Division dropdown option list: All + HR divisions present in data (sorted) + Other/Unmapped (if any)
+    // Builds the Division dropdown option list: All + HR divisions present in the current
+    // Throughput-Type-scoped data (sorted) + Other/Unmapped (if any)
     function getDivisionOptions() {
+      const scoped = getThroughputScopedThemes();
       const present = new Set();
-      originalThemes.forEach(t => t.divisions.forEach(d => present.add(d)));
+      scoped.forEach(t => t.divisions.forEach(d => present.add(d)));
       const hrPresent = Object.keys(hrTree).filter(d => present.has(d)).sort();
       const hasUnmapped = [...present].some(d => !isKnownDivision(d));
       const options = ['All', ...hrPresent];
@@ -395,7 +711,7 @@
     // when Division is 'All', the Group select is disabled with a single 'All Groups' option.
     function getGroupOptions(divisionName) {
       if (divisionName === 'All') return ['All'];
-      const divisionThemes = originalThemes.filter(t => themeMatchesDivision(t, divisionName));
+      const divisionThemes = getThroughputScopedThemes().filter(t => themeMatchesDivision(t, divisionName));
       const canonicalGroups = (divisionName !== OTHER_DIVISION_LABEL && isKnownDivision(divisionName)) ? hrTree[divisionName] : [];
       const liveGroups = new Set();
       divisionThemes.forEach(t => t.groups.forEach(g => liveGroups.add(g)));
@@ -434,6 +750,18 @@
       select.disabled = (selectedDivision === 'All');
     }
 
+    function populateThroughputSelect() {
+      const select = document.getElementById('throughput-select');
+      select.innerHTML = '';
+      getThroughputTypeOptions().forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt;
+        el.textContent = throughputTypeLabel(opt);
+        select.appendChild(el);
+      });
+      select.value = selectedThroughputType;
+    }
+
     // Calculations based on current selected filtered themes
     function calculateMetrics() {
       const activeThemes = themes;
@@ -453,6 +781,19 @@
       const readyPlannedPct = totalCount ? Math.round((readyPlannedCount / totalCount) * 100) : 0;
       const notReadyPct = totalCount ? Math.round((notReadyCount / totalCount) * 100) : 0;
 
+      // "Net New Scope" = every Theme that is NOT "In Progress" (i.e. not already-committed
+      // carry-over execution from a prior PI) - this is the actual new scope being planned.
+      const netNewThemes = activeThemes.filter(t => getStatusCategory(t.status) !== "carryOver");
+      const netNewCount = netNewThemes.length;
+      const netNewPct = totalCount ? Math.round((netNewCount / totalCount) * 100) : 0;
+
+      // Ownership Responsibility Matrix, scoped to Net New Themes only (per business rule -
+      // "In Progress" Themes are already committed R&D execution, not a live ownership question).
+      const pmCount = netNewThemes.filter(t => getOwnerGroup(t.status) === OWNER_PRODUCT_MGMT).length;
+      const rndCount = netNewThemes.filter(t => getOwnerGroup(t.status) === OWNER_RND).length;
+      const pmPct = netNewCount ? Math.round((pmCount / netNewCount) * 100) : 0;
+      const rndPct = netNewCount ? Math.round((rndCount / netNewCount) * 100) : 0;
+
       // Quality Flag calculations: scoped to committed themes only (category ready/planned/carryOver).
       // "Not Ready" backlog items (Open / HL Product Discovery / HL Dev Discovery) are pre-triage and
       // expected to lack an owner, so they are not penalized for missing-owner/flag quality issues.
@@ -461,15 +802,16 @@
       const flaggedCount = committedThemes.filter(t => t.flagged).length;
       const totalFlags = missingOwnerCount + flaggedCount;
 
-      // Base readiness metric formulation. Not Ready themes carry zero weight (Open / HL Discovery
-      // work has not been scoped or committed yet) but still count toward the total denominator,
-      // which correctly dilutes the score as more unscoped work is discovered for the PI.
-      let baseScore = 0;
-      if (totalCount > 0) {
-        let weightedTotal = (readyCount * 1.0) + (plannedCount * 0.7) + (carryOverCount * 0.1) + (notReadyCount * 0.0);
-        let penalties = (missingOwnerCount * 0.4) + (flaggedCount * 0.5);
-        baseScore = Math.max(0, Math.min(100, Math.round(((weightedTotal - penalties) / totalCount) * 100)));
-      }
+      // PI Readiness Index = (Ready + Planned) / (Total - In Progress/Carry-Over), as a percentage.
+      // Carry-Over themes are excluded from BOTH the numerator and the denominator: they already
+      // rolled over from a prior PI, so they're neither "new PI readiness" nor a fair thing to
+      // divide by. Not Ready themes (Open / HL Product Discovery / HL Dev Discovery) stay in the
+      // denominator only, which correctly dilutes the score as more unscoped backlog is discovered.
+      // Example: 10 Ready + 90 Planned, 1037 total, 245 In Progress -> 100 / (1037 - 245) = ~13%.
+      const readinessDenominator = totalCount - carryOverCount;
+      const baseScore = readinessDenominator > 0
+        ? Math.max(0, Math.min(100, Math.round((readyPlannedCount / readinessDenominator) * 100)))
+        : 0;
 
       return {
         totalCount,
@@ -485,7 +827,14 @@
         missingOwnerCount,
         flaggedCount,
         totalFlags,
-        readinessScore: baseScore
+        readinessDenominator,
+        readinessScore: baseScore,
+        netNewCount,
+        netNewPct,
+        pmCount,
+        rndCount,
+        pmPct,
+        rndPct
       };
     }
 
@@ -497,6 +846,8 @@
 
     // Dom Updates
     function updateActiveFilterChip() {
+      document.getElementById('throughput-chip-text').textContent = throughputTypeLabel(selectedThroughputType);
+
       const chip = document.getElementById('active-filter-chip');
       const chipText = document.getElementById('active-filter-chip-text');
       if (selectedDivision === 'All') {
@@ -518,6 +869,8 @@
       // Text Fields
       document.getElementById('readiness-score').innerText = `${metrics.readinessScore}%`;
       document.getElementById('readiness-progress-bar').style.width = `${metrics.readinessScore}%`;
+      document.getElementById('readiness-formula-desc').innerHTML =
+        `(Ready + Planned) &divide; (Total &minus; In Progress) = ${metrics.readyPlannedCount} &divide; ${metrics.readinessDenominator} = ${metrics.readinessScore}%`;
 
       const scoreStatusNode = document.getElementById('score-status');
       if (metrics.readinessScore >= 60) {
@@ -531,6 +884,9 @@
         scoreStatusNode.innerHTML = `<i data-lucide="alert-octagon" class="w-3 h-3 mr-0.5"></i> Critical`;
       }
 
+      document.getElementById('net-new-count').innerText = metrics.netNewCount;
+      document.getElementById('net-new-pct').innerText = `(${metrics.netNewPct}% of total)`;
+
       document.getElementById('carry-over-count').innerText = metrics.carryOverCount;
       document.getElementById('carry-over-pct').innerText = `(${metrics.carryOverPct}% of total)`;
 
@@ -542,19 +898,26 @@
       const subBar = document.getElementById('ready-breakdown-sub');
       subBar.innerHTML = `
         <div class="h-1 flex-1 bg-emerald-500 rounded-full" title="Ready (${metrics.readyCount})"></div>
-        <div class="h-1 flex-1 bg-emerald-500/50 rounded-full" title="Planned (${metrics.plannedCount})"></div>
-        <div class="h-1 flex-1 bg-slate-800 rounded-full" title="Carry Over (${metrics.carryOverCount})"></div>
+        <div class="h-1 flex-1 bg-teal-400 rounded-full" title="Planned (${metrics.plannedCount})"></div>
+        <div class="h-1 flex-1 bg-blue-500/40 rounded-full" title="Carry Over (${metrics.carryOverCount})"></div>
       `;
-
-      document.getElementById('flags-count').innerText = metrics.totalFlags;
-      document.getElementById('owner-missing-count').innerText = metrics.missingOwnerCount;
-      document.getElementById('dep-blocks-count').innerText = metrics.flaggedCount;
 
       document.getElementById('not-ready-count').innerText = metrics.notReadyCount;
       document.getElementById('not-ready-pct').innerText = `(${metrics.notReadyPct}% of total)`;
       document.getElementById('not-ready-progress-bar').style.width = `${metrics.notReadyPct}%`;
 
       document.getElementById('ring-center-stat').innerText = metrics.totalCount;
+
+      // Ownership Responsibility Matrix (Net New Scope only)
+      document.getElementById('pm-count').innerText = metrics.pmCount;
+      document.getElementById('pm-pct').innerText = `(${metrics.pmPct}% of Net New)`;
+      document.getElementById('rnd-count').innerText = metrics.rndCount;
+      document.getElementById('rnd-pct').innerText = `(${metrics.rndPct}% of Net New)`;
+      document.getElementById('ownership-split-pm-bar').style.width = `${metrics.pmPct}%`;
+      document.getElementById('ownership-split-rnd-bar').style.width = `${metrics.rndPct}%`;
+      document.getElementById('ownership-center-stat').innerText = metrics.netNewCount;
+      document.getElementById('ownership-legend-pm').innerText = `${metrics.pmCount} Themes`;
+      document.getElementById('ownership-legend-rnd').innerText = `${metrics.rndCount} Themes`;
 
       document.getElementById('rendered-count').innerText = metrics.totalCount;
       document.getElementById('total-count').innerText = originalThemes.length;
@@ -581,6 +944,17 @@
             <span class="font-semibold text-white">${count} Themes</span>
           </div>`;
       }).join('');
+
+      // Net New Scope KPI card: chip per raw status EXCEPT "In Progress" (i.e. every status
+      // that counts toward Net New Scope), in canonical order.
+      const netNewBreakdownDiv = document.getElementById('net-new-status-breakdown');
+      netNewBreakdownDiv.innerHTML = presentStatuses
+        .filter(status => getStatusCategory(status) !== 'carryOver')
+        .map(status => {
+          const meta = getStatusMeta(status);
+          const count = metrics.statusCounts[status] || 0;
+          return `<span class="px-2 py-0.5 rounded ${meta.badgeClasses} border font-medium">${escapeHtml(status)} (${count})</span>`;
+        }).join('');
 
       // Not Ready KPI card: chip per raw "notReady"-category status
       const notReadyBreakdownDiv = document.getElementById('not-ready-status-breakdown');
@@ -701,13 +1075,51 @@
           </div>`;
       }
 
+      // Ownership Responsibility Matrix insight (Net New Scope only)
+      insightsHTML += `
+        <div class="p-3 bg-fuchsia-500/5 border border-fuchsia-500/10 rounded-lg flex gap-3">
+          <div class="p-2 bg-fuchsia-500/10 text-fuchsia-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+            <i data-lucide="git-branch" class="w-4.5 h-4.5"></i>
+          </div>
+          <div>
+            <h4 class="text-xs font-bold text-white">Net New Ownership Split</h4>
+            <p class="text-[11px] text-slate-400 mt-0.5">Of ${metrics.netNewCount} Net New Themes, <strong class="text-fuchsia-300">${metrics.pmCount} (${metrics.pmPct}%)</strong> sit with Product Management (Open / HL Product Discovery) and <strong class="text-cyan-300">${metrics.rndCount} (${metrics.rndPct}%)</strong> sit with R&amp;D (Planned / Ready / HL Dev Discovery).</p>
+          </div>
+        </div>`;
+
+      if (metrics.netNewCount > 0 && metrics.pmPct >= 70) {
+        insightsHTML += `
+          <div class="p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="hourglass" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-amber-300">Product Management Discovery Bottleneck</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">${metrics.pmPct}% of Net New scope is still sitting with Product Management. R&amp;D readiness for ${SNAPSHOT_META.targetPI} depends on accelerating this discovery-to-scoping handoff.</p>
+            </div>
+          </div>`;
+      } else if (metrics.netNewCount > 0 && metrics.rndPct >= 70) {
+        insightsHTML += `
+          <div class="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg flex gap-3">
+            <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0 h-9 w-9 flex items-center justify-center">
+              <i data-lucide="check-check" class="w-4.5 h-4.5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-emerald-300">Discovery Pipeline Well-Fed</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">${metrics.rndPct}% of Net New scope has already cleared Product Management discovery and sits with R&amp;D, ready to plan or implement.</p>
+            </div>
+          </div>`;
+      }
+
       insightsPanel.innerHTML = insightsHTML;
 
       // Snapshot footer note
       document.getElementById('snapshot-footer').innerHTML = `
-        <div class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3 h-3"></i> Snapshot fetched: <strong class="text-slate-400">${escapeHtml(SNAPSHOT_META.fetchedAt)}</strong></div>
-        <div class="flex items-start gap-1.5"><i data-lucide="terminal" class="w-3 h-3 mt-0.5 shrink-0"></i> <span class="break-all">JQL: <code class="text-slate-400">${escapeHtml(SNAPSHOT_META.jql)}</code></span></div>
-        <div class="flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3 h-3"></i> This is a static snapshot &mdash; re-run the agent to refresh data.</div>
+        <div class="flex items-center gap-1.5 shrink-0"><i data-lucide="clock" class="w-3 h-3"></i> Snapshot fetched: <strong class="text-slate-400">${escapeHtml(SNAPSHOT_META.fetchedAt)}</strong></div>
+        <span class="hidden sm:inline text-slate-700">&bull;</span>
+        <div class="flex items-start gap-1.5 min-w-0"><i data-lucide="terminal" class="w-3 h-3 mt-0.5 shrink-0"></i> <span class="truncate">JQL: <code class="text-slate-400">${escapeHtml(SNAPSHOT_META.jql)}</code></span></div>
+        <span class="hidden sm:inline text-slate-700">&bull;</span>
+        <div class="flex items-center gap-1.5 shrink-0"><i data-lucide="refresh-cw" class="w-3 h-3"></i> Static snapshot &mdash; re-run the agent to refresh.</div>
       `;
 
       // Render Themes Table
@@ -719,7 +1131,7 @@
         const statusBadge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full font-medium ${statusMeta.badgeClasses} border"><span class="w-1.5 h-1.5 rounded-full ${statusMeta.dotClasses}"></span>${escapeHtml(theme.status)}</span>`;
 
         let carryOverBadge = statusMeta.category === 'carryOver'
-          ? `<span class="text-xs text-amber-400 font-bold tracking-wide flex items-center gap-1"><i data-lucide="repeat" class="w-3.5 h-3.5"></i> Yes (Carry-Over)</span>`
+          ? `<span class="text-xs text-blue-400 font-bold tracking-wide flex items-center gap-1"><i data-lucide="repeat" class="w-3.5 h-3.5"></i> Yes (Carry-Over)</span>`
           : `<span class="text-xs text-slate-500">No</span>`;
 
         let flagContent = '';
@@ -784,8 +1196,23 @@
       updateDOM();
     }
 
+    // Dynamic Filter handler on Throughput Type. Since this rescopes the whole universe of
+    // Themes, it resets Division/Group back to 'All' and repopulates their option lists.
+    function filterThroughputType(value) {
+      selectedThroughputType = value;
+      selectedDivision = 'All';
+      selectedGroup = 'All';
+      document.getElementById('throughput-select').value = value;
+      populateDivisionSelect();
+      populateGroupSelect();
+
+      applyFilters();
+      updateBarChartHeading();
+      updateDOM();
+    }
+
     function applyFilters() {
-      themes = originalThemes.filter(t => themeMatchesDivision(t, selectedDivision) && themeMatchesGroup(t, selectedGroup));
+      themes = getThroughputScopedThemes().filter(t => themeMatchesDivision(t, selectedDivision) && themeMatchesGroup(t, selectedGroup));
     }
 
     function updateBarChartHeading() {
@@ -804,6 +1231,9 @@
     }
 
     function resetData() {
+      selectedThroughputType = THROUGHPUT_DEFAULT;
+      populateThroughputSelect();
+      populateDivisionSelect();
       filterDivision('All');
     }
 
@@ -870,6 +1300,27 @@
           }
         }
       });
+
+      const ctxOwnership = document.getElementById('ownershipDonut').getContext('2d');
+      ownershipChart = new Chart(ctxOwnership, {
+        type: 'doughnut',
+        data: getOwnershipChartData(),
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1f2937',
+              titleColor: '#fff',
+              bodyColor: '#cbd5e1',
+              borderColor: '#374151',
+              borderWidth: 1
+            }
+          }
+        }
+      });
     }
 
     // Resolves the active labels (Divisions when 'All', or Groups scoped to the chosen Division).
@@ -882,7 +1333,8 @@
     // which reflects both the Division and Group filters.
     function getBarChartData() {
       let labels = [];
-      const divisionScopedThemes = selectedDivision === 'All' ? originalThemes : originalThemes.filter(t => themeMatchesDivision(t, selectedDivision));
+      const throughputScopedThemes = getThroughputScopedThemes();
+      const divisionScopedThemes = selectedDivision === 'All' ? throughputScopedThemes : throughputScopedThemes.filter(t => themeMatchesDivision(t, selectedDivision));
       const statuses = getPresentStatuses(divisionScopedThemes);
       const countsByStatus = {};
       statuses.forEach(s => countsByStatus[s] = []);
@@ -890,7 +1342,7 @@
       if (selectedDivision === 'All') {
         labels = getDivisionOptions().filter(d => d !== 'All');
         labels.forEach(divLabel => {
-          const bucket = originalThemes.filter(t => themeMatchesDivision(t, divLabel));
+          const bucket = throughputScopedThemes.filter(t => themeMatchesDivision(t, divLabel));
           statuses.forEach(s => countsByStatus[s].push(bucket.filter(t => t.status === s).length));
         });
       } else {
@@ -932,8 +1384,25 @@
       };
     }
 
+    // Ownership Split donut data - Net New Scope only (excludes "In Progress"), per OWNERSHIP_META.
+    function getOwnershipChartData() {
+      const netNewThemes = themes.filter(t => getStatusCategory(t.status) !== "carryOver");
+      const pmCount = netNewThemes.filter(t => getOwnerGroup(t.status) === OWNER_PRODUCT_MGMT).length;
+      const rndCount = netNewThemes.filter(t => getOwnerGroup(t.status) === OWNER_RND).length;
+      return {
+        labels: [OWNER_PRODUCT_MGMT, OWNER_RND],
+        datasets: [{
+          data: [pmCount, rndCount],
+          backgroundColor: [OWNERSHIP_COLORS[OWNER_PRODUCT_MGMT].chartColor, OWNERSHIP_COLORS[OWNER_RND].chartColor],
+          borderColor: '#111827',
+          borderWidth: 3,
+          hoverOffset: 4
+        }]
+      };
+    }
+
     function updateCharts(metrics) {
-      if (barChart && donutChart) {
+      if (barChart && donutChart && ownershipChart) {
         const barData = getBarChartData();
         barChart.data.labels = barData.labels;
         barChart.data.datasets = barData.datasets;
@@ -941,12 +1410,18 @@
 
         donutChart.data = getDonutChartData();
         donutChart.update();
+
+        ownershipChart.data = getOwnershipChartData();
+        ownershipChart.update();
       }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      renderPiTimeline();
+      populateThroughputSelect();
       populateDivisionSelect();
       populateGroupSelect();
+      applyFilters();
       initCharts();
       updateDOM();
     });

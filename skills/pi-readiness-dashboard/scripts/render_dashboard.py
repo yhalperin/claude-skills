@@ -19,6 +19,13 @@ Options:
                         that don't mangle embedded double quotes).
     --hrtree PATH       Path to the Division->Group JSON map. Defaults to the bundled
                         ../assets/hr_tree.json (canonical HR org chart snapshot).
+    --timeline PATH     Path to a fiscal-year PI timeline export (see DATA_SCHEMA.md for the
+                        expected shape). If supplied, the specific programIncrement matching
+                        --pi is extracted and rendered as a phase timeline at the head of the
+                        board (Pre-Planning/Planning/Execution/Retrospective, with today's phase
+                        highlighted). Defaults to the bundled ../assets/pi_timeline.json if
+                        present. If that default is missing, or --pi isn't found in the file,
+                        the timeline section is simply hidden - never an error.
     --division TEXT    Division scope used for the fetch. "All" (default) or a specific
                         canonical division name (e.g. "Secrets Manager"). This is a label only;
                         the dashboard's Division dropdown always shows whatever divisions are
@@ -38,6 +45,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = SCRIPT_DIR.parent / "assets" / "template.html"
 DEFAULT_HRTREE_PATH = SCRIPT_DIR.parent / "assets" / "hr_tree.json"
+DEFAULT_TIMELINE_PATH = SCRIPT_DIR.parent / "assets" / "pi_timeline.json"
 DEFAULT_BASE_URL = "https://ca-il-jira.il.cyber-ark.com:8443"
 
 
@@ -60,6 +68,7 @@ def main() -> int:
     parser.add_argument("--jql", default=None, help="The exact JQL used to fetch the data.")
     parser.add_argument("--jql-file", default=None, help="Path to a text file containing the JQL (avoids shell quoting issues on Windows/PowerShell - prefer this over --jql).")
     parser.add_argument("--hrtree", default=str(DEFAULT_HRTREE_PATH), help="Path to Division->Group JSON map.")
+    parser.add_argument("--timeline", default=str(DEFAULT_TIMELINE_PATH), help="Path to a fiscal-year PI timeline export JSON. Defaults to the bundled ../assets/pi_timeline.json.")
     parser.add_argument("--division", default="All", help='Division scope label: "All" or a specific division name.')
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="Jira base URL.")
     parser.add_argument("--out", default=None, help="Output HTML path.")
@@ -94,6 +103,23 @@ def main() -> int:
         return 1
 
     hr_tree = json.loads(hrtree_path.read_text(encoding="utf-8"))
+
+    pi_timeline = None
+    if args.timeline:
+        timeline_path = Path(args.timeline)
+        if not timeline_path.exists():
+            print(f"Timeline file not found: {timeline_path} (continuing without a timeline)", file=sys.stderr)
+        else:
+            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+            for fy in timeline_data.get("fiscalYears", []):
+                for pi in fy.get("programIncrements", []):
+                    if pi.get("name") == args.pi:
+                        pi_timeline = pi
+                        break
+                if pi_timeline:
+                    break
+            if not pi_timeline:
+                print(f"Note: PI '{args.pi}' not found in {timeline_path.name}; timeline section will be hidden.", file=sys.stderr)
 
     known_statuses = {"Ready for Implementation", "Planned", "In Progress", "Open", "HL Product Discovery", "HL Dev Discovery"}
     unknown = sorted({t.get("status") for t in themes if t.get("status") not in known_statuses})
@@ -131,12 +157,14 @@ def main() -> int:
         .replace("__SCOPE_NOTE_HTML__", scope_note_html)
         .replace("__HRTREE_JSON__", json_embed(hr_tree))
         .replace("__THEMES_JSON__", json_embed(themes))
+        .replace("__PI_TIMELINE_JSON__", json_embed(pi_timeline))
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(html, encoding="utf-8")
     print(f"Dashboard written to: {out_path}")
     print(f"Themes included: {len(themes)} | PI: {args.pi} | Division scope: {args.division}")
+    print(f"PI Timeline: {'included (' + pi_timeline['start'] + ' to ' + pi_timeline['end'] + ')' if pi_timeline else 'not included'}")
 
     if not args.no_open:
         webbrowser.open(out_path.resolve().as_uri())

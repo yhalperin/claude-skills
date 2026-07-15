@@ -1,0 +1,119 @@
+{
+  "exportType": "fiscal-year-timeline",
+  "exportedAt": "2026-07-15T10:52:39.970Z",
+  "fiscalYears": [
+    {
+      "fiscalYear": 2027,
+      "programIncrements": [
+        {
+          "id": "26j25ihgq",
+          "name": "27-Q1",
+          "start": "2026-08-02",
+          "end": "2026-11-07",
+          "sprints": 7,
+          "conceptualPlanningDate": null,
+          "midPIPlanningDate": "2026-09-19",
+          "phases": {
+            "prePlanning": {
+              "start": "2026-06-03",
+              "end": "2026-08-01"
+            },
+            "planning": {
+              "start": "2026-08-02",
+              "end": "2026-08-08"
+            },
+            "execution": {
+              "start": "2026-08-09",
+              "end": "2026-11-07"
+            },
+            "retrospective": {
+              "start": "2026-11-08",
+              "end": "2026-11-21"
+            }
+          }
+        },
+        {
+          "id": "k5r3xje0y",
+          "name": "27-Q2",
+          "start": "2026-11-08",
+          "end": "2027-01-30",
+          "sprints": 6,
+          "conceptualPlanningDate": null,
+          "midPIPlanningDate": "2026-12-19",
+          "phases": {
+            "prePlanning": {
+              "start": "2026-09-09",
+              "end": "2026-11-07"
+            },
+            "planning": {
+              "start": "2026-11-08",
+              "end": "2026-11-14"
+            },
+            "execution": {
+              "start": "2026-11-15",
+              "end": "2027-01-30"
+            },
+            "retrospective": {
+              "start": "2027-01-31",
+              "end": "2027-02-13"
+            }
+          }
+        },
+        {
+          "id": "t0kz99ufd",
+          "name": "27-Q3",
+          "start": "2027-01-31",
+          "end": "2027-04-24",
+          "sprints": 6,
+          "conceptualPlanningDate": null,
+          "midPIPlanningDate": "2027-03-13",
+          "phases": {
+            "prePlanning": {
+              "start": "2026-12-02",
+              "end": "2027-01-30"
+            },
+            "planning": {
+              "start": "2027-01-31",
+              "end": "2027-02-06"
+            },
+            "execution": {
+              "start": "2027-02-07",
+              "end": "2027-04-24"
+            },
+            "retrospective": {
+              "start": "2027-04-25",
+              "end": "2027-05-08"
+            }
+          }
+        },
+        {
+          "id": "390lw2xqk",
+          "name": "27-Q4",
+          "start": "2027-04-25",
+          "end": "2027-07-31",
+          "sprints": 7,
+          "conceptualPlanningDate": null,
+          "midPIPlanningDate": "2027-06-12",
+          "phases": {
+            "prePlanning": {
+              "start": "2027-02-24",
+              "end": "2027-04-24"
+            },
+            "planning": {
+              "start": "2027-04-25",
+              "end": "2027-05-01"
+            },
+            "execution": {
+              "start": "2027-05-02",
+              "end": "2027-07-31"
+            },
+            "retrospective": {
+              "start": "2027-08-01",
+              "end": "2027-08-14"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
