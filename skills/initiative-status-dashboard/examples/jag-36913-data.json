@@ -1,5 +1,12 @@
 {
   "generatedAt": "2026-07-19T15:12:00+03:00",
+  "piCalendar": {
+    "26-Q2": { "end": "2026-08-01" },
+    "27-Q1": { "start": "2026-08-02", "end": "2026-11-07" },
+    "27-Q2": { "start": "2026-11-08", "end": "2027-01-30" },
+    "27-Q3": { "start": "2027-01-31", "end": "2027-04-24" },
+    "27-Q4": { "start": "2027-04-25", "end": "2027-07-31" }
+  },
   "initiatives": {
     "jag-36913": {
       "title": "JAG-36913: Priv Cloud centralization + guided flows + Dark mode",

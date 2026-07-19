@@ -6,7 +6,9 @@ description: >-
   jira_search/jira_get_issue tools, and renders them as a distinctive,
   self-contained HTML dashboard (KPI cards, Master-Feature milestone table,
   dynamic Jira-Group workload distribution, filterable allocation swimlane
-  matrix, a Master-Feature x Planned-PI delivery schedule table,
+  matrix, a Master-Feature x Planned-PI delivery schedule table, an
+  Automated Insights panel flagging status/progress mismatches and
+  Planned-PI deadline risks with a detailed drill-down Insights tab, and a
   manually-editable Risks panel) that opens directly in a browser.
   Supports a combined dashboard for several initiatives at once via a header
   dropdown. Re-runnable at any point to refresh with current Jira state
@@ -19,7 +21,7 @@ disable-model-invocation: true
 
 # Initiative Status Dashboard
 
-Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone table, a Jira-Group allocation swimlane matrix, a Master-Feature x Planned-PI delivery schedule table, and a Risks panel with local persistence. The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
+Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone table, a Jira-Group allocation swimlane matrix, a Master-Feature x Planned-PI delivery schedule table, an Automated Insights panel (with a full drill-down "Insights" tab), and a Risks panel with local persistence. The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
 
 ## Workflow
 
@@ -44,15 +46,17 @@ Planned PI values look like `"26-Q2"` or `"27-Q1"`: `<fiscal-year>-Q<1-4>`. This
 
 To pick the latest value when an issue has multiple: convert each to an ordinal `year * 4 + (quarter - 1)` and take the max - this sorts correctly without needing real calendar dates. (Simple string comparison of `"YY-Qn"` labels also happens to sort correctly here, since both parts are fixed-width, but the ordinal is clearer to compute explicitly.)
 
-4. **Assemble the JSON** matching [DATA_SCHEMA.md](DATA_SCHEMA.md) exactly - one key per initiative under `initiatives`, all in a single file even when given several initiative IDs (the template's dropdown switches between them at runtime). Write it to a temp file, e.g. `initiative_data.json`. No extra work is needed for the "PI Delivery Schedule" tab - the template derives its columns (distinct Planned PI values, chronologically sorted) and row allocations directly from each feature's own `date` field.
+4. **Build the Planned PI calendar** (`piCalendar` in the schema) - this is what powers the Automated Insights panel's "Planned PI ending soon / already ended" checks. Look for a fiscal-quarter timeline file already in the workspace (e.g. the sibling `pi-readiness-dashboard` skill's `assets/pi_timeline.json`) and flatten its `programIncrement` entries (`name`, `start`, `end`) across all `fiscalYears` into `piCalendar[name] = {start, end}`. If a Planned PI value shows up in your fetched Jira data but you have no source for its exact dates (e.g. a legacy label from before a fiscal-calendar change, or simply not in the timeline file), either ask the user for its end date or omit it from `piCalendar` - never fabricate a date; the dashboard just skips deadline checks for PIs it can't resolve. This map is shared across all initiatives in the file (top-level, not per-initiative).
 
-5. **Render**:
+5. **Assemble the JSON** matching [DATA_SCHEMA.md](DATA_SCHEMA.md) exactly - one key per initiative under `initiatives`, plus the top-level `piCalendar`, all in a single file even when given several initiative IDs (the template's dropdown switches between them at runtime). Write it to a temp file, e.g. `initiative_data.json`. No extra work is needed for the "PI Delivery Schedule" tab or the "Automated Insights" panel/"Insights" tab beyond this - the template derives everything else (schedule columns/rows, mismatch detection grouped by finding, PI-deadline items grouped by Planned PI, deadline countdowns using the real current date) live from `masterFeatures`/`features`/`piCalendar`.
+
+6. **Render**:
    ```bash
    python scripts/render_dashboard.py --data initiative_data.json
    ```
    This injects the JSON into `assets/template.html` and writes `dashboard_<keys>.html` next to the data file (a **stable** filename, not timestamped - see "Re-running" below), then opens it in the default browser. Pass `--out <path>` to control the filename, or `--no-open` to skip auto-opening.
 
-6. Report a traversal summary per initiative: Initiative title, # Master Features, # Features resolved, and any fallbacks used (missing dates/groups).
+7. Report a traversal summary per initiative: Initiative title, # Master Features, # Features resolved, any fallbacks used (missing dates/groups), and a quick note of what the Automated Insights panel surfaced (e.g. "flagged 2 status mismatches and 1 Planned-PI group with 6 items still open for 26-Q2, ending in 12 days - full breakdown on the Insights tab").
 
 ## Re-running for a status update
 

@@ -5,6 +5,13 @@ This is the JSON payload `scripts/render_dashboard.py` injects into the dashboar
 ```jsonc
 {
   "generatedAt": "2026-07-13T15:55:00+03:00",   // ISO timestamp, informational only
+  "piCalendar": {                                // optional, shared across all initiatives - see "Planned PI calendar" below
+    "26-Q2": { "end": "2026-08-01" },             // legacy PI (no known start) - the last one before the current fiscal system
+    "27-Q1": { "start": "2026-08-02", "end": "2026-11-07" },
+    "27-Q2": { "start": "2026-11-08", "end": "2027-01-30" },
+    "27-Q3": { "start": "2027-01-31", "end": "2027-04-24" },
+    "27-Q4": { "start": "2027-04-25", "end": "2027-07-31" }
+  },
   "initiatives": {
     "jag-36913": {                               // key: lowercased initiative issue key - drives dropdown value + localStorage risk scoping
       "title": "JAG-36913: Priv Cloud centralization + guided flows + Dark mode",  // Initiative issue summary, prefixed with its key
@@ -54,3 +61,26 @@ This is the JSON payload `scripts/render_dashboard.py` injects into the dashboar
 - **`targetDate` / `date` / `stats.timelineTarget` / `horizon`**: sourced from each issue's own **Planned PI** custom field (confirm id via `jira_search_fields` with keyword `"Planned PI"`), not `duedate`. Format is `"<fiscal-year>-Q<1-4>"`, e.g. `"27-Q1"`. This company's FY `YY` starts Aug 1 of calendar year `YY-1` (Q1 Aug-Oct, Q2 Nov-Jan, Q3 Feb-Apr, Q4 May-Jul). If an issue has multiple Planned PI values, take the latest by ordinal `year*4 + (quarter-1)` and use its raw label as-is - never convert it to a calendar date. Fall back to `"TBD"` if the field is empty. Each level (Initiative, Master Feature, Feature) reads its **own** Planned PI value directly off that issue - this is not a rollup/aggregation from child issues.
 - **`risks`**: almost always `[]`. This is only a first-run seed; don't try to keep it in sync with real risk data on every regeneration - that's what the in-dashboard Add/Export/Import UI and localStorage are for.
 - All fields default gracefully to "TBD" placeholders in the template - never omit a key, but "TBD" / `0` / `[]` are safe fallbacks throughout.
+
+## Planned PI calendar (`piCalendar`)
+
+Optional top-level map from a Planned PI label (as it appears in `targetDate`/`date`/`stats.timelineTarget`/`horizon`) to its exact `{ "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" }` calendar dates. It powers the dashboard's **Automated Insights** panel's "Planned PI ending soon" / "Planned PI already ended" checks (see below) - without it, those specific checks are silently skipped (status/progress mismatch checks still run regardless).
+
+- Source real `{name, start, end}` triples from a fiscal-quarter timeline file if the workspace has one (e.g. the sibling `pi-readiness-dashboard` skill's `assets/pi_timeline.json` - flatten every `programIncrement` across all its `fiscalYears` entries into `piCalendar[name] = {start, end}`).
+- `start` may be omitted for a legacy/edge PI whose exact start isn't known (e.g. a label used right before a fiscal-calendar system changed) - only `end` is required for the deadline checks to work.
+- Never fabricate exact dates for a PI you have no source for. If a Planned PI value shows up in the fetched Jira data but isn't in your timeline source and you can't otherwise pin down its `end` date, just omit it from `piCalendar` - the dashboard skips deadline-risk checks for it rather than guessing wrong.
+- This is shared across every initiative in the file, not per-initiative, since PIs are company-wide.
+
+## Automated Insights (no data to author - fully derived by the template)
+
+The dashboard computes an "Automated Insights" panel entirely client-side from `masterFeatures`/`features` plus `piCalendar` - there's nothing to add to the JSON for this beyond `piCalendar` itself. It flags, live and using the real current date on every page load:
+
+- **Status/progress mismatch**: a Master-Feature marked `Completed` while its features average under 100% progress, or marked `Planned` while one or more of its features already show progress (or are fully `Completed`) - i.e. the Master-Feature's own Jira status looks stale relative to its children. Each mismatched Master-Feature is its own finding group.
+- **Planned PI ending soon / already ended**: every Feature or Master-Feature that isn't `Completed` yet and whose own Planned PI (resolved via `piCalendar`) ends within 14 days or has already passed is collapsed into ONE finding group per `(Planned PI, ended-vs-soon)` pair - e.g. "6 items still open for Planned PI 26-Q2, which ends in 12 days" - rather than one card per item.
+
+Findings surface in two places, kept in sync automatically:
+
+- **Executive Summary tab**: one compact, clickable card per finding group (title + severity badge). Clicking a card jumps to the Insights tab and scrolls/highlights that group.
+- **Insights tab** (next to "PI Delivery Schedule"): the full breakdown - every finding group rendered as its own section with a table of every item behind it (name, type, status, progress, Planned PI).
+
+Because these come purely from data you already provide, just make sure `piCalendar` is populated with whatever real PI dates you can source (see above) - the insight logic itself never needs to change per run.
