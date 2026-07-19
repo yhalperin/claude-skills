@@ -158,6 +158,10 @@
                         <i data-lucide="split" class="w-4 h-4"></i>
                         Allocation Swimlanes
                     </button>
+                    <button id="tab-schedule-btn" onclick="switchTab('schedule')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+                        <i data-lucide="calendar-range" class="w-4 h-4"></i>
+                        PI Delivery Schedule
+                    </button>
                 </div>
 
                 <!-- Time Horizon Indicator -->
@@ -380,6 +384,51 @@
 
             </div>
 
+            <div id="tab-schedule" class="hidden space-y-6">
+
+                <!-- Filter bar & schedule interactive instructions -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Master-Feature Delivery Schedule</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Features plotted by their own Planned PI, columns sorted chronologically. **Click a Master-Feature in the left column** to isolate it (synced with Allocation Swimlanes).</p>
+                    </div>
+
+                    <!-- Filter state banner (shared state with Allocation Swimlanes) -->
+                    <div class="flex items-center gap-2 text-xs" id="schedule-filter-banner-container">
+                        <!-- Active filters injected dynamically here -->
+                    </div>
+                </div>
+
+                <!-- PI Schedule Matrix Grid -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse text-left text-xs min-w-[900px]">
+                            <thead>
+                                <tr id="schedule-header-row" class="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-850">
+                                    <th class="py-4 px-4 w-[280px] font-semibold text-slate-500 dark:text-slate-400">Master-Feature (Milestone)</th>
+                                    <!-- Planned PI columns injected dynamically, sorted chronologically -->
+                                </tr>
+                            </thead>
+                            <tbody id="schedule-body" class="divide-y divide-slate-150 dark:divide-slate-800">
+                                <!-- Dynamically populated based on selected initiative & filtering -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Schedule footer explanation and legend -->
+                    <div class="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-150 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span> Completed Feature (100%)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span> In Progress Feature (1-99%)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-rose-500"></span> Blocked Feature (Stalled)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-slate-300 dark:bg-slate-600"></span> Planned Feature (0%)</span>
+                        </div>
+                        <span class="text-slate-400 font-medium">Columns are each Feature's own Planned PI, sorted chronologically left to right (a "TBD" column collects unscheduled features).</span>
+                    </div>
+                </div>
+
+            </div>
+
         </main>
 
         <!-- Slide-Over/Modal: CSV Data Schema Studio -->
@@ -461,9 +510,11 @@
         const elStatTimelineVariance = document.getElementById("stat-timeline-variance");
         const elMilestonesTableBody = document.getElementById("milestones-table-body");
         const elMatrixSwimlaneBody = document.getElementById("matrix-swimlane-body");
+        const elScheduleBody = document.getElementById("schedule-body");
         const elCsvDrawer = document.getElementById("csv-drawer");
         const elCsvRawTextarea = document.getElementById("csv-raw-textarea");
         const elFilterBannerContainer = document.getElementById("matrix-filter-banner-container");
+        const elScheduleFilterBannerContainer = document.getElementById("schedule-filter-banner-container");
         const elRisksListContainer = document.getElementById("risks-list-container");
         const elRiskForm = document.getElementById("risk-form");
 
@@ -539,6 +590,8 @@
             renderGroupWorkloadDistribution(data.masterFeatures);
             renderMilestonesTable(data.masterFeatures);
             renderMatrixSwimlanes(data.masterFeatures);
+            renderScheduleMatrix(data.masterFeatures);
+            updateFilterBanners();
             renderRisks();
 
             // Trigger lucide icon compilation
@@ -839,6 +892,47 @@
             event.target.value = "";
         }
 
+        // Build the small feature card shared by Allocation Swimlanes (grouped by Group) and PI Delivery Schedule (grouped by Planned PI).
+        // footerLabel is the secondary info shown bottom-left of the card - the Group's own PI date in the swimlanes, the Feature's Group in the schedule.
+        function buildFeatureCardHtml(feat, footerLabel) {
+            let statusColorClass = "bg-slate-300";
+            let borderClass = "border-slate-200 dark:border-slate-800";
+            let textStatus = "Planned";
+            let statusBadgeStyle = "bg-slate-100 dark:bg-slate-800 text-slate-500";
+
+            if (feat.status === "Completed") {
+                statusColorClass = "bg-emerald-500";
+                borderClass = "border-emerald-100 dark:border-emerald-950";
+                textStatus = "Completed";
+                statusBadgeStyle = "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400";
+            } else if (feat.status === "In Progress") {
+                statusColorClass = "bg-amber-500";
+                borderClass = "border-amber-100 dark:border-amber-950";
+                textStatus = "In Progress";
+                statusBadgeStyle = "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400";
+            } else if (feat.status === "Blocked") {
+                statusColorClass = "bg-rose-500";
+                borderClass = "border-rose-200 dark:border-rose-950/60";
+                textStatus = "Blocked";
+                statusBadgeStyle = "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900";
+            }
+
+            return `
+                <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all">
+                    <div class="space-y-1">
+                        <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${feat.name}</h5>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-1 mt-2">
+                        <span class="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 dark:bg-slate-800/80 px-1 rounded">${footerLabel || 'TBD'}</span>
+                        <span class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusBadgeStyle}">${textStatus}</span>
+                    </div>
+                    <div class="mt-2 w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                        <div class="${statusColorClass} h-1 rounded-full" style="width: ${feat.progress}%;"></div>
+                    </div>
+                </div>
+            `;
+        }
+
         // Render primary Division/Group Allocation matrix swimlanes (columns are derived live from each Theme's "Group" field)
         function renderMatrixSwimlanes(masterFeatures) {
             const groupNames = getDistinctGroups(masterFeatures);
@@ -849,9 +943,6 @@
                 groupNames.map(g => `<th class="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400 text-center border-l border-slate-150 dark:border-slate-850">${g} Group</th>`).join("");
 
             elMatrixSwimlaneBody.innerHTML = "";
-
-            // Update matrix active filter indicator
-            renderFilterIndicatorBar(masterFeatures);
 
             masterFeatures.forEach(mf => {
                 // If filtering is enabled and this doesn't match, skip rendering it
@@ -878,45 +969,7 @@
                     }
 
                     // Render multiple cards if multiple features are allocated to the same group under this Master-Feature
-                    let featuresCardsHtml = "";
-                    matchedFeatures.forEach(feat => {
-                        let statusColorClass = "bg-slate-300";
-                        let borderClass = "border-slate-200 dark:border-slate-800";
-                        let textStatus = "Planned";
-                        let statusBadgeStyle = "bg-slate-100 dark:bg-slate-800 text-slate-500";
-
-                        if (feat.status === "Completed") {
-                            statusColorClass = "bg-emerald-500";
-                            borderClass = "border-emerald-100 dark:border-emerald-950";
-                            textStatus = "Completed";
-                            statusBadgeStyle = "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400";
-                        } else if (feat.status === "In Progress") {
-                            statusColorClass = "bg-amber-500";
-                            borderClass = "border-amber-100 dark:border-amber-950";
-                            textStatus = "In Progress";
-                            statusBadgeStyle = "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400";
-                        } else if (feat.status === "Blocked") {
-                            statusColorClass = "bg-rose-500";
-                            borderClass = "border-rose-200 dark:border-rose-950/60";
-                            textStatus = "Blocked";
-                            statusBadgeStyle = "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900";
-                        }
-
-                        featuresCardsHtml += `
-                            <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all">
-                                <div class="space-y-1">
-                                    <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${feat.name}</h5>
-                                </div>
-                                <div class="pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-1 mt-2">
-                                    <span class="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 dark:bg-slate-800/80 px-1 rounded">${feat.date || 'TBD'}</span>
-                                    <span class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusBadgeStyle}">${textStatus}</span>
-                                </div>
-                                <div class="mt-2 w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
-                                    <div class="${statusColorClass} h-1 rounded-full" style="width: ${feat.progress}%;"></div>
-                                </div>
-                            </div>
-                        `;
-                    });
+                    const featuresCardsHtml = matchedFeatures.map(feat => buildFeatureCardHtml(feat, feat.date)).join("");
 
                     cellsHtml += `
                         <td class="py-3 px-3 border-l border-slate-150 dark:border-slate-850 align-top space-y-2">
@@ -948,21 +1001,111 @@
             });
         }
 
-        // Render filter description state banner
-        function renderFilterIndicatorBar() {
-            if (activeMasterFeatureFilter) {
-                elFilterBannerContainer.innerHTML = `
-                    <span class="px-2.5 py-1 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-brand-200 dark:border-brand-900">
-                        Isolating Master-Feature: <strong class="truncate max-w-[180px]">${activeMasterFeatureFilter.replace("Master-Feature: ", "")}</strong>
-                        <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-brand-500 hover:text-brand-700"><i data-lucide="x" class="w-3.5 h-3.5 inline"></i></button>
-                    </span>
-                    <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-xs text-slate-400 hover:text-slate-600 underline">Show All</button>
+        // Convert a "YY-Qn" Planned PI label into a sortable ordinal (fiscalYear*4 + (quarter-1)); returns null for
+        // non-PI values like "TBD" so they can be sorted last. This company's FY "YY" starts Aug 1 of calendar year YY-1.
+        function piOrdinal(pi) {
+            const match = /^(\d{2})-Q([1-4])$/.exec(pi || "");
+            if (!match) return null;
+            return parseInt(match[1], 10) * 4 + (parseInt(match[2], 10) - 1);
+        }
+
+        // Distinct set of Feature-level Planned PI values actually present in this initiative, sorted chronologically
+        // (unrecognized values like "TBD" are pushed to the end, in first-seen order)
+        function getSortedPlannedPIs(masterFeatures) {
+            const values = [];
+            masterFeatures.forEach(mf => {
+                mf.features.forEach(f => {
+                    if (!values.includes(f.date)) values.push(f.date);
+                });
+            });
+            const known = values.filter(v => piOrdinal(v) !== null).sort((a, b) => piOrdinal(a) - piOrdinal(b));
+            const unknown = values.filter(v => piOrdinal(v) === null);
+            return known.concat(unknown);
+        }
+
+        // Render the Master-Feature x Planned-PI delivery schedule (columns are each Feature's own "PlannedPI" value, chronologically sorted)
+        function renderScheduleMatrix(masterFeatures) {
+            const piColumns = getSortedPlannedPIs(masterFeatures);
+
+            const headerRow = document.getElementById("schedule-header-row");
+            headerRow.innerHTML = `<th class="py-4 px-4 w-[280px] font-semibold text-slate-500 dark:text-slate-400">Master-Feature (Milestone)</th>` +
+                piColumns.map(pi => `<th class="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400 text-center border-l border-slate-150 dark:border-slate-850">${pi}</th>`).join("");
+
+            elScheduleBody.innerHTML = "";
+
+            masterFeatures.forEach(mf => {
+                if (activeMasterFeatureFilter && mf.name !== activeMasterFeatureFilter) {
+                    return;
+                }
+
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-all duration-200";
+
+                let cellsHtml = "";
+
+                piColumns.forEach(pi => {
+                    const matchedFeatures = mf.features.filter(f => f.date === pi);
+
+                    if (matchedFeatures.length === 0) {
+                        cellsHtml += `
+                            <td class="py-4 px-3 border-l border-slate-150 dark:border-slate-850 bg-slate-50/20 dark:bg-slate-900/10 align-top">
+                                <p class="text-slate-300 dark:text-slate-700 italic text-[10px] text-center font-mono py-6">-</p>
+                            </td>
+                        `;
+                        return;
+                    }
+
+                    // Cards here show each feature's Group instead of its date, since the column already encodes the Planned PI
+                    const featuresCardsHtml = matchedFeatures.map(feat => buildFeatureCardHtml(feat, feat.group)).join("");
+
+                    cellsHtml += `
+                        <td class="py-3 px-3 border-l border-slate-150 dark:border-slate-850 align-top space-y-2">
+                            ${featuresCardsHtml}
+                        </td>
+                    `;
+                });
+
+                const isFiltered = activeMasterFeatureFilter === mf.name;
+                const highlightStyle = isFiltered
+                    ? "bg-brand-50/40 dark:bg-brand-950/10 border-l-4 border-l-brand-500"
+                    : "";
+
+                tr.innerHTML = `
+                    <td class="py-4 px-4 font-semibold text-slate-800 dark:text-slate-100 text-xs align-middle leading-snug max-w-[280px] cursor-pointer group ${highlightStyle}" onclick="toggleRowFilter('${mf.name}')">
+                        <div class="space-y-1.5">
+                            <span class="text-brand-600 dark:text-brand-400 font-bold text-[10px] tracking-wider uppercase block">Master-Feature</span>
+                            <span class="hover:text-brand-500 font-bold leading-normal block transition-colors">${mf.name}</span>
+                            <div class="flex items-center gap-1.5 mt-2 font-mono text-[9px] text-slate-400 font-bold uppercase">
+                                <span class="bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200 dark:border-slate-800">Target ${mf.targetDate}</span>
+                                <span class="text-brand-500 font-bold hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Isolate row</span>
+                            </div>
+                        </div>
+                    </td>
+                    ${cellsHtml}
                 `;
-            } else {
-                elFilterBannerContainer.innerHTML = `
-                    <span class="text-slate-400 text-xs italic">All Master-Feature Swimlanes Visible</span>
-                `;
-            }
+
+                elScheduleBody.appendChild(tr);
+            });
+        }
+
+        // Update the "active filter" banners shared by Allocation Swimlanes and PI Delivery Schedule (same activeMasterFeatureFilter state)
+        function updateFilterBanners() {
+            [elFilterBannerContainer, elScheduleFilterBannerContainer].forEach(banner => {
+                if (!banner) return;
+                if (activeMasterFeatureFilter) {
+                    banner.innerHTML = `
+                        <span class="px-2.5 py-1 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-brand-200 dark:border-brand-900">
+                            Isolating Master-Feature: <strong class="truncate max-w-[180px]">${activeMasterFeatureFilter.replace("Master-Feature: ", "")}</strong>
+                            <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-brand-500 hover:text-brand-700"><i data-lucide="x" class="w-3.5 h-3.5 inline"></i></button>
+                        </span>
+                        <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-xs text-slate-400 hover:text-slate-600 underline">Show All</button>
+                    `;
+                } else {
+                    banner.innerHTML = `
+                        <span class="text-slate-400 text-xs italic">All Master-Feature Rows Visible</span>
+                    `;
+                }
+            });
             lucide.createIcons();
         }
 
@@ -992,23 +1135,22 @@
         }
 
         // Switch main content view tabs
-        function switchTab(target) {
-            const tabSnapshot = document.getElementById("tab-snapshot");
-            const tabMatrix = document.getElementById("tab-matrix");
-            const btnSnapshot = document.getElementById("tab-snapshot-btn");
-            const btnMatrix = document.getElementById("tab-matrix-btn");
+        const TAB_NAMES = ["snapshot", "matrix", "schedule"];
+        const TAB_BTN_ACTIVE_CLASS = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
+        const TAB_BTN_INACTIVE_CLASS = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
 
-            if (target === "snapshot") {
-                tabSnapshot.classList.remove("hidden");
-                tabMatrix.classList.add("hidden");
-                btnSnapshot.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
-                btnMatrix.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
-            } else {
-                tabSnapshot.classList.add("hidden");
-                tabMatrix.classList.remove("hidden");
-                btnSnapshot.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
-                btnMatrix.className = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
-            }
+        function switchTab(target) {
+            TAB_NAMES.forEach(name => {
+                const panel = document.getElementById(`tab-${name}`);
+                const btn = document.getElementById(`tab-${name}-btn`);
+                if (name === target) {
+                    panel.classList.remove("hidden");
+                    btn.className = TAB_BTN_ACTIVE_CLASS;
+                } else {
+                    panel.classList.add("hidden");
+                    btn.className = TAB_BTN_INACTIVE_CLASS;
+                }
+            });
             lucide.createIcons();
         }
 
