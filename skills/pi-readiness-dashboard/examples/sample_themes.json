@@ -7,6 +7,7 @@
     "status": "In Progress",
     "owner": "Tal Zamir",
     "flagged": false,
+    "throughputType": null,
     "url": "https://ca-il-jira.il.cyber-ark.com:8443/browse/AGAI-1440"
   },
   {
@@ -17,6 +18,7 @@
     "status": "Planned",
     "owner": null,
     "flagged": false,
+    "throughputType": "A. Feature",
     "url": "https://ca-il-jira.il.cyber-ark.com:8443/browse/CC-198192"
   },
   {
@@ -24,9 +26,10 @@
     "title": "SCA Tile Deprecation",
     "divisions": ["Cloud Security"],
     "groups": ["SCA"],
-    "status": "Not Ready",
+    "status": "Open",
     "owner": "Adi Moldavski",
     "flagged": false,
+    "throughputType": "B. Tech",
     "url": "https://ca-il-jira.il.cyber-ark.com:8443/browse/SCA-52199"
   }
 ]
