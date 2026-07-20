@@ -257,8 +257,9 @@
 
                 </div>
 
-                <!-- Automated Insights Panel: status/progress mismatches and Planned-PI deadline risks, detected live from the
-                     data below plus the current date - not persisted, recalculated fresh on every render/page load -->
+                <!-- Automated Insights Panel: status/progress mismatches, Planned-PI deadline risks, and Initiative
+                     timeline slippage (latest Planned PI vs Jira Timeframe), detected live from the data below plus
+                     the current date - not persisted, recalculated fresh on every render/page load -->
                 <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
                     <div class="flex items-center justify-between mb-4">
                         <div>
@@ -266,7 +267,7 @@
                                 <i data-lucide="sparkles" class="w-4 h-4 text-brand-500"></i>
                                 Automated Insights
                             </h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Status/progress mismatches and Planned-PI deadline risks, detected live from the current data and date. Click a card for the full item list.</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Status/progress mismatches, Planned-PI deadline risks, and Initiative timeline slippage, detected live from the current data and date. Click a card for the full item list.</p>
                         </div>
                         <span id="insights-count-badge" class="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500 font-mono flex-shrink-0">0 Insights</span>
                     </div>
@@ -624,10 +625,16 @@
 
             elStatTimelineRange.innerText = data.timelineRange;
             elStatTimelineTarget.innerText = data.stats.timelineTarget;
-            elStatTimelineVariance.innerText = data.stats.timelineVariance;
+
+            // Status Sync is normally the authored stats.timelineVariance, but gets auto-overridden to "Off Track"
+            // whenever the Initiative's own latest Planned PI (stats.timelineTarget) resolves - via PI_CALENDAR - to a
+            // later date than its Jira Timeframe field (data.timelineRange, e.g. "July 2026") - see detectTimelineOffTrack().
+            const timelineMismatch = detectTimelineOffTrack(data);
+            const effectiveVariance = timelineMismatch ? "Off Track" : data.stats.timelineVariance;
+            elStatTimelineVariance.innerText = effectiveVariance;
 
             // Update color style of variance based on schedule status
-            if (data.stats.timelineVariance.includes("Risk") || data.stats.timelineVariance.includes("Delayed") || data.stats.timelineVariance.includes("Stalling")) {
+            if (effectiveVariance.includes("Risk") || effectiveVariance.includes("Delayed") || effectiveVariance.includes("Stalling") || effectiveVariance.includes("Off Track")) {
                 elStatTimelineVariance.className = "font-semibold text-rose-500 dark:text-rose-400";
             } else {
                 elStatTimelineVariance.className = "font-semibold text-emerald-600 dark:text-emerald-400";
@@ -640,7 +647,7 @@
             renderScheduleMatrix(data.masterFeatures);
             updateFilterBanners();
             renderRisks();
-            renderInsights(data.masterFeatures);
+            renderInsights(data);
 
             // Trigger lucide icon compilation
             lucide.createIcons();
@@ -972,6 +979,34 @@
             return Math.round((toDate.getTime() - fromDate.getTime()) / msPerDay);
         }
 
+        // Jira's "Timeframe" field on the Initiative comes through as a "<Month name> <YYYY>" label (e.g. "July 2026").
+        // Resolve it to that month's last calendar day for the off-track comparison below. Returns null for anything
+        // that doesn't match the pattern ("TBD", quarters, etc.) - the off-track check simply skips those rather than guessing.
+        const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+        function parseTimeframeEndDate(text) {
+            if (!text) return null;
+            const match = /^([A-Za-z]+)\s+(\d{4})$/.exec(text.trim());
+            if (!match) return null;
+            const monthIndex = MONTH_NAMES.indexOf(match[1].toLowerCase());
+            if (monthIndex === -1) return null;
+            return new Date(parseInt(match[2], 10), monthIndex + 1, 0); // day 0 of next month = last day of this month
+        }
+
+        // Detects whether the Initiative's own latest Planned PI (stats.timelineTarget, resolved via PI_CALENDAR) ends
+        // later than its committed Jira Timeframe (data.timelineRange) - i.e. delivery has slipped past what was
+        // committed. Returns null (no verdict) whenever either date can't be resolved, rather than guessing.
+        function detectTimelineOffTrack(data) {
+            const piLabel = data.stats && data.stats.timelineTarget;
+            if (!piLabel) return null;
+            const piEntry = resolvePiCalendarEntry(piLabel);
+            if (!piEntry || !piEntry.end) return null;
+            const timeframeEnd = parseTimeframeEndDate(data.timelineRange);
+            if (!timeframeEnd) return null;
+            const piEnd = new Date(piEntry.end + "T00:00:00");
+            if (piEnd <= timeframeEnd) return null;
+            return { piLabel, daysLate: daysBetween(timeframeEnd, piEnd) };
+        }
+
         // One group per Master-Feature whose own status looks stale relative to its features' actual state
         function collectMismatchGroups(masterFeatures) {
             const groups = [];
@@ -1047,15 +1082,32 @@
             });
         }
 
-        // Full insight sweep across one initiative's Master-Features/Features, sorted critical-first
-        function computeInsightGroups(masterFeatures) {
-            const groups = [...collectMismatchGroups(masterFeatures), ...collectPiDeadlineGroups(masterFeatures)];
+        // Single group (if any) flagging the Initiative itself as Off Track because its latest Planned PI has slipped past its Jira Timeframe
+        function collectTimelineMismatchGroup(data) {
+            const mismatch = detectTimelineOffTrack(data);
+            if (!mismatch) return [];
+            return [{
+                id: `timeline-off-track-${slug(data.title)}`,
+                severity: "critical",
+                title: `Latest Planned PI (${mismatch.piLabel}) ends ${mismatch.daysLate} day${mismatch.daysLate === 1 ? '' : 's'} after the Initiative's Jira Timeframe (${data.timelineRange}) - marked Off Track`,
+                items: [{ name: data.title, kind: "Initiative", status: "Off Track", progress: null, note: `PI ${mismatch.piLabel} vs Timeframe ${data.timelineRange}` }]
+            }];
+        }
+
+        // Full insight sweep across one initiative: Master-Feature/Feature mismatches, PI deadline risk, and the
+        // Initiative-level Timeframe-vs-Planned-PI check, sorted critical-first
+        function computeInsightGroups(data) {
+            const groups = [
+                ...collectMismatchGroups(data.masterFeatures),
+                ...collectPiDeadlineGroups(data.masterFeatures),
+                ...collectTimelineMismatchGroup(data)
+            ];
             const severityOrder = { critical: 0, warning: 1 };
             return groups.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
         }
 
-        function renderInsights(masterFeatures) {
-            const groups = computeInsightGroups(masterFeatures);
+        function renderInsights(data) {
+            const groups = computeInsightGroups(data);
             const totalItems = groups.reduce((sum, g) => sum + g.items.length, 0);
             elInsightsCountBadge.innerText = `${groups.length} Insight${groups.length === 1 ? '' : 's'} \u00b7 ${totalItems} item${totalItems === 1 ? '' : 's'}`;
 
@@ -1101,7 +1153,7 @@
                         <td class="py-2.5 px-3 text-xs font-medium text-slate-700 dark:text-slate-200">${item.name}</td>
                         <td class="py-2.5 px-3 text-center"><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">${item.kind}</span></td>
                         <td class="py-2.5 px-3 text-center text-xs text-slate-600 dark:text-slate-300">${item.status}</td>
-                        <td class="py-2.5 px-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400">${item.progress}%</td>
+                        <td class="py-2.5 px-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400">${typeof item.progress === "number" ? item.progress + "%" : "\u2014"}</td>
                         <td class="py-2.5 px-3 text-right font-mono text-[10px] text-slate-400">${item.note || ''}</td>
                     </tr>
                 `).join("");

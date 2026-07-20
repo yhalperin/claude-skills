@@ -19,12 +19,12 @@ This is the JSON payload `scripts/render_dashboard.py` injects into the dashboar
       "statusColor": "emerald",                   // "emerald" | "amber" | "rose" - drives the pill color, pick per statusColor rule below
       "scope": "TBD",                              // free text scope badge; "TBD" if no clear scope field exists
       "horizon": "Target 27-Q1",                    // "Target <Planned PI>" using the Initiative issue's own Planned PI (latest value if several), else "Target TBD"
-      "timelineRange": "TBD",                       // free text, e.g. "Jul 2026 - Oct 2026" or "TBD"
+      "timelineRange": "July 2026",                 // Initiative issue's Jira "Timeframe" field value, verbatim (e.g. "July 2026"); "TBD" if empty - see "Timeframe field" below
       "stats": {
         "totalFeatures": 14,                        // count of all leaf features across all master features
         "completedFeatures": 5,                      // count of leaf features with status "Completed"
         "timelineTarget": "27-Q1",                    // the Initiative issue's own Planned PI (latest value if several), else "TBD" - see Planned PI notes below
-        "timelineVariance": "On Schedule"              // "On Schedule" | "Delayed" | "Ahead of Schedule" | "At Risk"
+        "timelineVariance": "On Schedule"              // "On Schedule" | "Delayed" | "Ahead of Schedule" | "At Risk" - your best-guess fallback; the template auto-overrides this to "Off Track" whenever it can prove timelineTarget's PI ends after timelineRange (see "Timeframe field" below), so don't try to hand-compute that case
       },
       "risks": [],                                    // seed risks shown only the first time this initiative id is opened in a given browser;
                                                         // leave [] unless the user gave you specific risks to seed. Real usage adds/edits risks
@@ -59,6 +59,7 @@ This is the JSON payload `scripts/render_dashboard.py` injects into the dashboar
 - **`progress` on masterFeatures**: `Math.round` of the mean of its `features[].progress`; 0 if it has no features yet.
 - **`group`**: pull from the Jira "Group" custom field on the leaf issue (id varies per instance - confirm via `jira_search_fields` with keyword `"group"`, e.g. `customfield_22029`). Fall back to `"Platform Core"` if empty. This is a single value here (unlike the sibling `release-scope-dashboard` skill's `groups` array) - if the field is multiselect, join with `", "` or take the first value.
 - **`targetDate` / `date` / `stats.timelineTarget` / `horizon`**: sourced from each issue's own **Planned PI** custom field (confirm id via `jira_search_fields` with keyword `"Planned PI"`), not `duedate`. Format is `"<fiscal-year>-Q<1-4>"`, e.g. `"27-Q1"`. This company's FY `YY` starts Aug 1 of calendar year `YY-1` (Q1 Aug-Oct, Q2 Nov-Jan, Q3 Feb-Apr, Q4 May-Jul). If an issue has multiple Planned PI values, take the latest by ordinal `year*4 + (quarter-1)` and use its raw label as-is - never convert it to a calendar date. Fall back to `"TBD"` if the field is empty. Each level (Initiative, Master Feature, Feature) reads its **own** Planned PI value directly off that issue - this is not a rollup/aggregation from child issues.
+- **`timelineRange`**: sourced from the Initiative issue's own Jira **"Timeframe"** custom field (confirm id via `jira_search_fields` with keyword `"Timeframe"` - this instance has two fields both named `Timeframe`, e.g. `customfield_22925` and `customfield_15120`; check whichever is actually populated on the issue, they may return identical values). The field comes back as `{ "value": "<Month name> <YYYY>" }`, e.g. `"July 2026"` - use that string verbatim. Fall back to `"TBD"` if empty or in an unrecognized shape. See "Timeframe field" below for how this powers the automatic Off Track check.
 - **`risks`**: almost always `[]`. This is only a first-run seed; don't try to keep it in sync with real risk data on every regeneration - that's what the in-dashboard Add/Export/Import UI and localStorage are for.
 - All fields default gracefully to "TBD" placeholders in the template - never omit a key, but "TBD" / `0` / `[]` are safe fallbacks throughout.
 
@@ -71,12 +72,21 @@ Optional top-level map from a Planned PI label (as it appears in `targetDate`/`d
 - Never fabricate exact dates for a PI you have no source for. If a Planned PI value shows up in the fetched Jira data but isn't in your timeline source and you can't otherwise pin down its `end` date, just omit it from `piCalendar` - the dashboard skips deadline-risk checks for it rather than guessing wrong.
 - This is shared across every initiative in the file, not per-initiative, since PIs are company-wide.
 
+## Timeframe field (`timelineRange`) and the automatic Off Track check
+
+`timelineRange` holds the Initiative issue's own Jira **"Timeframe"** field value verbatim - a `"<Month name> <YYYY>"` label like `"July 2026"` representing the committed delivery month. The template parses this to that month's last calendar day and compares it against `stats.timelineTarget`'s own resolved PI end date (via `piCalendar`):
+
+- If the latest Planned PI ends **after** the Timeframe month, the Initiative has slipped past what was committed - the "Status Sync" badge on the Planned Timeline KPI card is automatically forced to **"Off Track"** (overriding whatever you authored in `stats.timelineVariance`), and a matching Automated Insight is raised (see below).
+- If either date can't be resolved (`timelineRange` isn't a parseable `"<Month> <YYYY>"` string, or `stats.timelineTarget`'s PI isn't in `piCalendar`), the check is silently skipped and your authored `stats.timelineVariance` stands as-is - never guess dates yourself to force this.
+- This means you should NOT try to hand-compute "Off Track" in `stats.timelineVariance` - just author your best-guess fallback there for cases the automatic check can't resolve, and populate `timelineRange` + `piCalendar` accurately; the template derives the verdict live.
+
 ## Automated Insights (no data to author - fully derived by the template)
 
-The dashboard computes an "Automated Insights" panel entirely client-side from `masterFeatures`/`features` plus `piCalendar` - there's nothing to add to the JSON for this beyond `piCalendar` itself. It flags, live and using the real current date on every page load:
+The dashboard computes an "Automated Insights" panel entirely client-side from `masterFeatures`/`features` plus `piCalendar`/`timelineRange` - there's nothing to add to the JSON for this beyond those fields. It flags, live and using the real current date on every page load:
 
 - **Status/progress mismatch**: a Master-Feature marked `Completed` while its features average under 100% progress, or marked `Planned` while one or more of its features already show progress (or are fully `Completed`) - i.e. the Master-Feature's own Jira status looks stale relative to its children. Each mismatched Master-Feature is its own finding group.
 - **Planned PI ending soon / already ended**: every Feature or Master-Feature that isn't `Completed` yet and whose own Planned PI (resolved via `piCalendar`) ends within 14 days or has already passed is collapsed into ONE finding group per `(Planned PI, ended-vs-soon)` pair - e.g. "6 items still open for Planned PI 26-Q2, which ends in 12 days" - rather than one card per item.
+- **Initiative timeline slippage (Off Track)**: one group when the Initiative's latest Planned PI ends later than its Jira Timeframe (see above) - e.g. "Latest Planned PI (27-Q2) ends 194 days after the Initiative's Jira Timeframe (July 2026) - marked Off Track".
 
 Findings surface in two places, kept in sync automatically:
 
