@@ -86,6 +86,10 @@ Every Master-Feature and Feature card/row shows a small traffic-light **Health**
 
 Nothing needs to be added to the JSON for this beyond `masterFeatures`/`features` and `piCalendar` already being populated accurately.
 
+**Why this health? (click-to-explain).** Every badge that isn't Good is clickable - clicking it opens a small popover listing the exact reason(s) it isn't Good in plain English (e.g. *"Marked Completed, but its features are only 40% done on average (2/5 completed)."*, or, rolled up from a child, *"Feature 'X': Planned PI 26-Q2 ends in 5 days, and this is still In Progress."*). Good badges have no reasons and aren't clickable. This uses the exact same `computeMasterFeatureHealth`/`computeFeatureHealth` results as the badge color itself, so the popover text and the badge color can never disagree.
+
+**Click-through from Executive Summary to Schedule.** Clicking anywhere on a Master-Feature milestone card in the Executive Summary tab (outside the Health badge itself, which opens its own popover instead) jumps to the PI Delivery Schedule tab with that Master-Feature isolated via the same row filter used by clicking a row there directly.
+
 ## Group filter (PI Delivery Schedule tab)
 
 The PI Delivery Schedule tab includes a multi-select **Filter by Group** pill row, built live from the distinct `group` values found across all `features[]` in the current initiative (the same values used by the Group Distribution KPI on the Executive Summary tab). Selecting one or more groups restricts the schedule table to only features (and Master-Feature rows that still have a match) in those groups; selecting none shows everything. No separate JSON field is needed - just populate `group` accurately on every feature.

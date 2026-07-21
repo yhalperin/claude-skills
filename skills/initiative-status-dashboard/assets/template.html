@@ -568,60 +568,150 @@
 
         // Signal 1: is this item's own Planned PI already over (while still open) or ending soon, or is it Blocked?
         // Completed items are never deadline-flagged here - a stale "Completed" is caught by the mismatch check instead.
+        // Returns { level, reason } - reason is a human-readable string, or null when level is "good".
         function computeDeadlineHealth(piLabel, status, today) {
-            if (status === "Completed") return "good";
-            if (status === "Blocked") return "at-risk";
+            if (status === "Completed") return { level: "good", reason: null };
+            if (status === "Blocked") return { level: "at-risk", reason: "Marked Blocked in Jira." };
 
             const entry = resolvePiCalendarEntry(piLabel);
-            if (!entry || !entry.end) return "good"; // no PI dates to judge by - don't guess
+            if (!entry || !entry.end) return { level: "good", reason: null }; // no PI dates to judge by - don't guess
 
             const end = new Date(entry.end + "T00:00:00");
             const daysLeft = daysBetween(today, end);
 
-            if (daysLeft < 0) return "at-risk"; // Planned PI already ended and item still open - late
-            if (daysLeft <= PI_DEADLINE_SOON_DAYS) return "warning"; // PI ending soon and item hasn't finished yet
-            return "good";
+            if (daysLeft < 0) {
+                const days = Math.abs(daysLeft);
+                return { level: "at-risk", reason: `Planned PI ${piLabel} ended ${days} day${days === 1 ? '' : 's'} ago, but this is still ${status}.` };
+            }
+            if (daysLeft <= PI_DEADLINE_SOON_DAYS) {
+                return { level: "warning", reason: `Planned PI ${piLabel} ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}, and this is still ${status}.` };
+            }
+            return { level: "good", reason: null };
         }
 
         // Feature health = just its own deadline signal (a leaf Feature's `progress` always derives 1:1 from its own
         // `status` per the data schema, so there's no separate self-mismatch signal to check at this level).
+        // Returns { level, reasons: [{ level, text }, ...] }.
         function computeFeatureHealth(feature, today) {
-            return computeDeadlineHealth(feature.date, feature.status, today);
+            const deadline = computeDeadlineHealth(feature.date, feature.status, today);
+            return { level: deadline.level, reasons: deadline.reason ? [{ level: deadline.level, text: deadline.reason }] : [] };
         }
 
         // Master-Feature health = worst of: its own deadline signal, its own status/progress self-mismatch, and the
         // worst Health of any Feature underneath it (a Master-Feature can never look healthier than its features).
+        // Returns { level, reasons: [{ level, text }, ...] } - reasons are only populated for non-"good" contributors.
         function computeMasterFeatureHealth(mf, today) {
-            let health = computeDeadlineHealth(mf.targetDate, mf.status, today);
+            const reasons = [];
+            const deadline = computeDeadlineHealth(mf.targetDate, mf.status, today);
+            let health = deadline.level;
+            if (deadline.reason) reasons.push({ level: deadline.level, text: deadline.reason });
 
             // Self mismatch: same thresholds as the "status/progress mismatch" Automated Insight, so the badge and the
             // insight always agree - e.g. marked Completed but only 40% actually done is "At Risk", not "Good".
+            const totalFeatures = mf.features.length;
             const completedCount = mf.features.filter(f => f.status === "Completed").length;
             const startedCount = mf.features.filter(f => f.progress > 0).length;
 
             if (mf.status === "Completed" && mf.progress < 100) {
-                health = worseHealth(health, mf.progress < 50 ? "at-risk" : "warning");
+                const level = mf.progress < 50 ? "at-risk" : "warning";
+                health = worseHealth(health, level);
+                reasons.push({ level, text: `Marked Completed, but its features are only ${mf.progress}% done on average (${completedCount}/${totalFeatures} completed).` });
             }
             if (mf.status === "Planned" && startedCount > 0) {
-                health = worseHealth(health, completedCount > 0 ? "at-risk" : "warning");
+                const level = completedCount > 0 ? "at-risk" : "warning";
+                health = worseHealth(health, level);
+                reasons.push({ level, text: `Still marked Planned, but ${startedCount}/${totalFeatures} of its features already show progress${completedCount > 0 ? ` (${completedCount} fully completed)` : ''}.` });
             }
 
-            // Roll-up
+            // Roll-up: pull in every non-"good" Feature's own reason too, so it's clear which Feature(s) are dragging the Master-Feature down
             mf.features.forEach(f => {
-                health = worseHealth(health, computeFeatureHealth(f, today));
+                const fHealth = computeFeatureHealth(f, today);
+                health = worseHealth(health, fHealth.level);
+                fHealth.reasons.forEach(r => reasons.push({ level: r.level, text: `Feature "${f.name}": ${r.text}` }));
             });
 
-            return health;
+            return { level: health, reasons };
         }
 
-        function healthBadgeHtml(level, extraClass) {
-            const style = HEALTH_STYLES[level] || HEALTH_STYLES.good;
-            return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${style.badge} ${extraClass || ''} flex-shrink-0"><span class="w-1.5 h-1.5 rounded-full ${style.dot}"></span>${style.label}</span>`;
+        // Registry mapping a short-lived popover id -> its reasons array, so onclick handlers only need to pass an id
+        // (avoids re-serializing arbitrary reason text, which may contain quotes, into inline HTML attributes)
+        let HEALTH_REASON_REGISTRY = {};
+        let healthReasonIdCounter = 0;
+
+        // health = { level, reasons }. The badge is only clickable when level isn't "good" and there's at least one reason.
+        function healthBadgeHtml(health, extraClass) {
+            const style = HEALTH_STYLES[health.level] || HEALTH_STYLES.good;
+            const hasReasons = health.level !== "good" && health.reasons && health.reasons.length > 0;
+
+            let clickAttr = "";
+            let interactiveClass = "";
+            if (hasReasons) {
+                const id = `health-reason-${healthReasonIdCounter++}`;
+                HEALTH_REASON_REGISTRY[id] = health.reasons;
+                clickAttr = `onclick="toggleHealthPopover(event, '${id}');"`;
+                interactiveClass = "cursor-pointer hover:ring-1 hover:ring-current";
+            }
+
+            return `<span ${clickAttr} class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${style.badge} ${interactiveClass} ${extraClass || ''} flex-shrink-0" ${hasReasons ? 'title="Click for details"' : ''}><span class="w-1.5 h-1.5 rounded-full ${style.dot}"></span>${style.label}${hasReasons ? '<i data-lucide="info" class="w-2.5 h-2.5 ml-0.5"></i>' : ''}</span>`;
         }
+
+        // Floating popover explaining exactly why a Health badge isn't "Good" - opened by clicking the badge,
+        // closed by clicking it again, clicking elsewhere, or its own close button. Never opens for "Good" badges.
+        function toggleHealthPopover(event, reasonId) {
+            event.stopPropagation();
+            const existing = document.getElementById("health-popover");
+            const wasOpenForSameBadge = existing && existing.dataset.for === reasonId;
+            if (existing) existing.remove();
+            if (wasOpenForSameBadge) return;
+
+            const reasons = HEALTH_REASON_REGISTRY[reasonId] || [];
+            const popover = document.createElement("div");
+            popover.id = "health-popover";
+            popover.dataset.for = reasonId;
+            popover.className = "fixed z-50 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3";
+            popover.onclick = (e) => e.stopPropagation();
+            popover.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Why this health?</span>
+                    <button onclick="closeHealthPopover();" class="text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-300 flex-shrink-0"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                </div>
+                <div class="space-y-2">
+                    ${reasons.map(r => {
+                        const style = HEALTH_STYLES[r.level] || HEALTH_STYLES.warning;
+                        return `<div class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full ${style.dot} mt-1 flex-shrink-0"></span><span class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">${r.text}</span></div>`;
+                    }).join("")}
+                </div>
+            `;
+            document.body.appendChild(popover);
+
+            // Position under the clicked badge, nudged to stay on-screen
+            const rect = event.currentTarget.getBoundingClientRect();
+            const popoverWidth = 288; // w-72
+            let left = Math.min(rect.left, window.innerWidth - popoverWidth - 12);
+            left = Math.max(left, 12);
+            popover.style.top = `${rect.bottom + 6}px`;
+            popover.style.left = `${left}px`;
+
+            lucide.createIcons();
+        }
+
+        function closeHealthPopover() {
+            const existing = document.getElementById("health-popover");
+            if (existing) existing.remove();
+        }
+
+        // Close the popover on any click outside it (registered once at parse time - the popover itself is created/destroyed dynamically)
+        document.addEventListener("click", function() {
+            closeHealthPopover();
+        });
 
         // Master Rendering Router
         function renderDashboard() {
             const data = INITIATIVE_DATA[currentInitiativeKey];
+
+            // Reset the Health-reason popover registry every render - it's only ever referenced by badges from the render that just happened
+            HEALTH_REASON_REGISTRY = {};
+            closeHealthPopover();
 
             // Update top bar text & metadata metrics
             document.getElementById("initiative-scope-badge").innerText = data.scope;
@@ -795,7 +885,8 @@
             return "bg-emerald-500";
         }
 
-        // Render Milestones (Master-Features) as a responsive card grid, each with a Health badge and a circular progress ring
+        // Render Milestones (Master-Features) as a responsive card grid, each with a Health badge and a circular progress ring.
+        // Clicking a card (outside the Health badge) jumps to the PI Delivery Schedule tab, isolated to that Master-Feature.
         function renderMilestonesGrid(masterFeatures) {
             const today = new Date();
             const ringRadius = 24;
@@ -805,10 +896,11 @@
                 const health = computeMasterFeatureHealth(mf, today);
                 const clampedProgress = Math.min(Math.max(mf.progress, 0), 100);
                 const offset = circumference * (1 - clampedProgress / 100);
+                const mfNameEscaped = mf.name.replace(/'/g, "\\'");
 
                 return `
-                    <div class="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 pl-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
-                        <div class="absolute top-0 left-0 w-1.5 h-full ${healthAccentClass(health)}"></div>
+                    <div class="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 pl-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-300 dark:hover:border-brand-800 transition-all duration-300 overflow-hidden cursor-pointer" onclick="jumpToScheduleForMasterFeature('${mfNameEscaped}')">
+                        <div class="absolute top-0 left-0 w-1.5 h-full ${healthAccentClass(health.level)}"></div>
                         <div class="flex items-start justify-between gap-2 mb-3">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Master-Feature</span>
                             ${healthBadgeHtml(health)}
@@ -832,9 +924,21 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center gap-1 text-[10px] font-semibold text-brand-500 dark:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <i data-lucide="calendar-range" class="w-3 h-3"></i> View in PI Delivery Schedule &rarr;
+                        </div>
                     </div>
                 `;
             }).join("");
+        }
+
+        // Jump from an Executive Summary milestone card to the PI Delivery Schedule tab, isolated to that one Master-Feature
+        function jumpToScheduleForMasterFeature(masterFeatureName) {
+            activeMasterFeatureFilter = masterFeatureName;
+            activeGroupFilters.clear();
+            renderDashboard();
+            switchTab("schedule");
+            toastAlert(`Filtered PI Delivery Schedule by "${masterFeatureName.replace("Master-Feature: ", "")}".`);
         }
 
         // --- Automated Insights Engine ---
