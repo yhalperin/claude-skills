@@ -4,31 +4,31 @@ description: >-
   Traverses one or more Jira Initiatives (Initiative -> Master Feature ->
   leaf Feature, via the "Parent Link" field) using the MCP policy broker's
   jira_search/jira_get_issue tools, and renders them as a distinctive,
-  self-contained HTML dashboard (KPI cards, Master-Feature milestone table,
-  dynamic Jira-Group workload distribution, filterable allocation swimlane
-  matrix, a Master-Feature x Planned-PI delivery schedule table, an
-  Automated Insights panel flagging status/progress mismatches and
-  Planned-PI deadline risks with a detailed drill-down Insights tab, and a
-  manually-editable Risks panel) that opens directly in a browser.
-  Supports a combined dashboard for several initiatives at once via a header
-  dropdown. Re-runnable at any point to refresh with current Jira state
-  without losing manually-logged risks. Use when the user asks to generate
-  an initiative status dashboard/board, summarize one or more initiatives'
-  progress, or visualize Jira initiative/master-feature rollup as a
-  shareable HTML page.
+  self-contained HTML dashboard (KPI cards, a Master-Feature milestone card
+  grid, dynamic Jira-Group workload distribution, a Master-Feature x
+  Planned-PI delivery schedule table with a multi-select Group filter, a
+  per-item traffic-light Health indicator, and an Automated Insights panel
+  flagging status/progress mismatches, Planned-PI deadline risks, and
+  Initiative timeline slippage with a detailed drill-down Insights tab)
+  that opens directly in a browser. Supports a combined dashboard for
+  several initiatives at once via a header dropdown. Re-runnable at any
+  point to refresh with current Jira state. Use when the user asks to
+  generate an initiative status dashboard/board, summarize one or more
+  initiatives' progress, or visualize Jira initiative/master-feature
+  rollup as a shareable HTML page.
 disable-model-invocation: true
 ---
 
 # Initiative Status Dashboard
 
-Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone table, a Jira-Group allocation swimlane matrix, a Master-Feature x Planned-PI delivery schedule table, an Automated Insights panel (with a full drill-down "Insights" tab), and a Risks panel with local persistence. The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
+Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone card grid with per-item Health badges, a Master-Feature x Planned-PI delivery schedule table with a multi-select Group filter, and an Automated Insights panel (with a full drill-down "Insights" tab). The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
 
 ## Workflow
 
 1. **Confirm scope.** Get the Initiative issue key(s) to traverse (e.g. `JAG-36913`, or several at once). If the user gave them, use them. Ask only if genuinely ambiguous.
 
 2. **Fetch data from Jira.** Use the `user-policy-broker` MCP tools (`jira_get_issue`, `jira_search`, `jira_search_fields`) per broker usage rules - never bypass the broker. For each Initiative:
-   - Fetch the Initiative issue itself, including its **Planned PI** custom field (fields `summary,status,customfield_<planned_pi_id>` - confirm the id once per instance via `jira_search_fields` with keyword `"Planned PI"`, e.g. `customfield_14422`, exact name `"PlannedPI"`, a multiselect option field returned as `{ "value": ["27-Q1", "26-Q2"] }`) and its **Timeframe** custom field (confirm the id via `jira_search_fields` with keyword `"Timeframe"` - this instance has two same-named candidates, e.g. `customfield_22925` and `customfield_15120`, use whichever is populated; returned as `{ "value": "<Month name> <YYYY>" }`, e.g. `"July 2026"` -> `timelineRange`).
+   - Fetch the Initiative issue itself, including its **Planned PI** custom field (fields `summary,status,customfield_<planned_pi_id>` - confirm the id once per instance via `jira_search_fields` with keyword `"Planned PI"`, e.g. `customfield_14422`, exact name `"PlannedPI"`, a multiselect option field returned as `{ "value": ["27-Q1", "26-Q2"] }`) and its **Delivery Target** custom field (confirm the id via `jira_search_fields` with keyword `"Delivery Target"`, e.g. `customfield_22933`; returned as `{ "value": "YY-MM" }`, e.g. `"26-07"` (July 2026) or `"26-12"` (December 2026) -> `timelineRange`).
    - Level 2 - Master Features: `jira_search` with JQL `"Parent Link" = <INITIATIVE_KEY>` (fields `summary,status,issuetype,customfield_<planned_pi_id>`). This Jira instance links hierarchy via the **"Parent Link"** custom field (commonly `customfield_11140`), not the standard `parent` field - confirm the id once per instance via `jira_search_fields` with keyword `"parent"` if the JQL above returns nothing.
    - Level 3 - Features: for each Master Feature key, `jira_search` with JQL `"Parent Link" = <MF_KEY>` (fields `summary,status,issuetype,customfield_<planned_pi_id>,customfield_22029` or whatever the Group field id resolves to - confirm via `jira_search_fields` with keyword `"group"`).
    - **Stop at Level 3.** These leaf issues are the dashboard's "Feature" entries regardless of their literal Jira issue type name (this org typically uses `Theme`, not `Feature` - there is no distinct Feature issue type here). Do not traverse further into any children/Epics nested under them.
@@ -36,8 +36,8 @@ Produces one self-contained HTML file - no server, no build step - visualizing o
 3. **Map fields** per issue, with fallbacks so nothing renders broken:
    - Status category -> dashboard status + progress: `Done` -> `Completed`/100, `In Progress` -> `In Progress`/50, `Blocked`/Flagged -> `Blocked`/10, `To Do`/Backlog -> `Planned`/0.
    - `group`: Jira Group custom field value, else `"Platform Core"`.
-   - `date`/`targetDate`/`stats.timelineTarget`/`horizon`: the issue's own **Planned PI** value (Initiative -> `stats.timelineTarget`/`horizon`, Master Feature -> `targetDate`, Feature -> `date`). Planned PI is a multi-value field - if an issue has several PI values assigned, take the **chronologically latest one** and use its raw label verbatim (e.g. `"27-Q1"`) as the displayed value; don't convert it to a calendar date. Empty -> `"TBD"`. See "Planned PI quarters" below for the format and how to pick the latest.
-   - `timelineRange`: the Initiative issue's own **Timeframe** value, verbatim (e.g. `"July 2026"`). Empty/unrecognized shape -> `"TBD"`. Do NOT try to hand-derive `stats.timelineVariance`'s "Off Track" case from this yourself - the template cross-checks `timelineRange` against `stats.timelineTarget` (via `piCalendar`) automatically on render; just populate both fields accurately and let it compute the verdict.
+   - `date`/`targetDate`/`stats.timelineTarget`/`horizon`: the issue's own **Planned PI** value (Initiative -> `stats.timelineTarget`/`horizon`, Master Feature -> `targetDate`, Feature -> `date`). Planned PI is a multi-value field - if an issue has several PI values assigned, take the **chronologically latest one** and use its raw label verbatim (e.g. `"27-Q1"`) as the displayed value; don't convert it to a calendar date. Empty -> `"TBD"`. See "Planned PI quarters" below for the format and how to pick the latest. This same value also drives that item's traffic-light **Health** badge (see below) - no separate field needed.
+   - `timelineRange`: the Initiative issue's own **Delivery Target** value, verbatim (e.g. `"26-07"`). Empty/unrecognized shape -> `"TBD"`. Do NOT try to hand-derive `stats.timelineVariance`'s "Off Track" case from this yourself - the template cross-checks `timelineRange` against `stats.timelineTarget` (via `piCalendar`) automatically on render; just populate both fields accurately and let it compute the verdict.
    - Master Feature `progress` = round(average of its features' `progress`); its own `status`/color use the same status-category mapping applied to the Master Feature issue itself.
    - `stats.totalFeatures`/`completedFeatures` = counts across all features under that initiative.
 
@@ -47,9 +47,9 @@ Planned PI values look like `"26-Q2"` or `"27-Q1"`: `<fiscal-year>-Q<1-4>`. This
 
 To pick the latest value when an issue has multiple: convert each to an ordinal `year * 4 + (quarter - 1)` and take the max - this sorts correctly without needing real calendar dates. (Simple string comparison of `"YY-Qn"` labels also happens to sort correctly here, since both parts are fixed-width, but the ordinal is clearer to compute explicitly.)
 
-4. **Build the Planned PI calendar** (`piCalendar` in the schema) - this is what powers the Automated Insights panel's "Planned PI ending soon / already ended" checks. Look for a fiscal-quarter timeline file already in the workspace (e.g. the sibling `pi-readiness-dashboard` skill's `assets/pi_timeline.json`) and flatten its `programIncrement` entries (`name`, `start`, `end`) across all `fiscalYears` into `piCalendar[name] = {start, end}`. If a Planned PI value shows up in your fetched Jira data but you have no source for its exact dates (e.g. a legacy label from before a fiscal-calendar change, or simply not in the timeline file), either ask the user for its end date or omit it from `piCalendar` - never fabricate a date; the dashboard just skips deadline checks for PIs it can't resolve. This map is shared across all initiatives in the file (top-level, not per-initiative).
+4. **Build the Planned PI calendar** (`piCalendar` in the schema) - this powers both the Automated Insights panel's "Planned PI ending soon / already ended" checks AND every item's traffic-light **Health** badge. Look for a fiscal-quarter timeline file already in the workspace (e.g. the sibling `pi-readiness-dashboard` skill's `assets/pi_timeline.json`) and flatten its `programIncrement` entries (`name`, `start`, `end`) across all `fiscalYears` into `piCalendar[name] = {start, end}`. If a Planned PI value shows up in your fetched Jira data but you have no source for its exact dates (e.g. a legacy label from before a fiscal-calendar change, or simply not in the timeline file), either ask the user for its end date or omit it from `piCalendar` - never fabricate a date; the dashboard just skips deadline/health checks for PIs it can't resolve (and defaults their Health to "Good" rather than guessing).
 
-5. **Assemble the JSON** matching [DATA_SCHEMA.md](DATA_SCHEMA.md) exactly - one key per initiative under `initiatives`, plus the top-level `piCalendar`, all in a single file even when given several initiative IDs (the template's dropdown switches between them at runtime). Write it to a temp file, e.g. `initiative_data.json`. No extra work is needed for the "PI Delivery Schedule" tab or the "Automated Insights" panel/"Insights" tab beyond this - the template derives everything else (schedule columns/rows, mismatch detection grouped by finding, PI-deadline items grouped by Planned PI, deadline countdowns using the real current date) live from `masterFeatures`/`features`/`piCalendar`.
+5. **Assemble the JSON** matching [DATA_SCHEMA.md](DATA_SCHEMA.md) exactly - one key per initiative under `initiatives`, plus the top-level `piCalendar`, all in a single file even when given several initiative IDs (the template's dropdown switches between them at runtime). Write it to a temp file, e.g. `initiative_data.json`. No extra work is needed for the "PI Delivery Schedule" tab (including its Group filter), the Health badges, or the "Automated Insights" panel/"Insights" tab beyond this - the template derives everything else (schedule columns/rows, Group filter options, per-item Health, mismatch detection grouped by finding, PI-deadline items grouped by Planned PI, deadline countdowns using the real current date) live from `masterFeatures`/`features`/`piCalendar`.
 
 6. **Render**:
    ```bash
@@ -57,11 +57,11 @@ To pick the latest value when an issue has multiple: convert each to an ordinal 
    ```
    This injects the JSON into `assets/template.html` and writes `dashboard_<keys>.html` next to the data file (a **stable** filename, not timestamped - see "Re-running" below), then opens it in the default browser. Pass `--out <path>` to control the filename, or `--no-open` to skip auto-opening.
 
-7. Report a traversal summary per initiative: Initiative title, # Master Features, # Features resolved, any fallbacks used (missing dates/groups), and a quick note of what the Automated Insights panel surfaced (e.g. "flagged 2 status mismatches, 1 Planned-PI group with 6 items still open for 26-Q2 ending in 12 days, and an Off Track timeline slip (latest PI 27-Q2 vs Timeframe July 2026) - full breakdown on the Insights tab").
+7. Report a traversal summary per initiative: Initiative title, # Master Features, # Features resolved, any fallbacks used (missing dates/groups), a quick count of items with a "Warning"/"At Risk" Health badge, and a note of what the Automated Insights panel surfaced (e.g. "flagged 2 status mismatches, 1 Planned-PI group with 6 items still open for 26-Q2 ending in 12 days, and an Off Track timeline slip (latest PI 27-Q2 vs Delivery Target 26-07) - full breakdown on the Insights tab").
 
 ## Re-running for a status update
 
-Same initiative key(s), same workflow. Manually-added risks live in the browser's `localStorage`, keyed by initiative id **and** the file's origin/path - so reuse the exact same output filename (the script's default is already stable and reproducible per initiative-key-set) to keep risks intact across regenerations. If the user needs to move the dashboard to a different path/machine, tell them to use the in-dashboard **Export** button first and **Import** after regenerating.
+Same initiative key(s), same workflow - just re-fetch and re-render. There's no local state to preserve between runs (the Health badges, Automated Insights, and filters are all derived live from the JSON + the real current date), so simply overwrite the previous output file.
 
 ## Additional resources
 

@@ -7,9 +7,7 @@ JSON shape.
 
 Unlike a timestamped-output pattern, this defaults to a STABLE output filename
 (derived from the initiative keys, no timestamp) so that regenerating the same
-dashboard reuses the same file:// origin - manually-added risks are persisted
-in the browser's localStorage keyed by that origin + initiative id, and would
-otherwise be orphaned by a new filename on every run.
+dashboard reuses the same path/bookmark across status updates.
 
 Usage:
     python render_dashboard.py --data initiative_data.json [--out output.html] [--no-open]

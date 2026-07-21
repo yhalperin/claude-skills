@@ -154,10 +154,6 @@
                         <i data-lucide="layout" class="w-4 h-4"></i>
                         Executive Summary
                     </button>
-                    <button id="tab-matrix-btn" onclick="switchTab('matrix')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-                        <i data-lucide="split" class="w-4 h-4"></i>
-                        Allocation Swimlanes
-                    </button>
                     <button id="tab-schedule-btn" onclick="switchTab('schedule')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                         <i data-lucide="calendar-range" class="w-4 h-4"></i>
                         PI Delivery Schedule
@@ -258,8 +254,8 @@
                 </div>
 
                 <!-- Automated Insights Panel: status/progress mismatches, Planned-PI deadline risks, and Initiative
-                     timeline slippage (latest Planned PI vs Jira Timeframe), detected live from the data below plus
-                     the current date - not persisted, recalculated fresh on every render/page load -->
+                     timeline slippage (latest Planned PI vs Jira Delivery Target), detected live from the data below
+                     plus the current date - not persisted, recalculated fresh on every render/page load -->
                 <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
                     <div class="flex items-center justify-between mb-4">
                         <div>
@@ -276,132 +272,21 @@
                     </div>
                 </div>
 
-                <!-- Snapshot Main Content Area -->
-                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-                    <!-- Left Column: Master-Features (Milestones) Tracking Table (60%) -->
-                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm lg:col-span-3">
-                        <div class="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 class="text-base font-semibold text-slate-900 dark:text-white">Master-Features (Milestones)</h3>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">Core milestone delivery rollup with corresponding execution health</p>
-                            </div>
-                            <div class="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500 font-mono">
-                                1 Master-Feature = 1 Major Milestone
-                            </div>
+                <!-- Master-Features (Milestones) Panel - full width (Initiative Risks panel has been removed) -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Master-Features (Milestones)</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Core milestone delivery rollup with corresponding execution health</p>
                         </div>
-
-                        <!-- Milestone Table -->
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs border-collapse">
-                                <thead>
-                                    <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase font-semibold">
-                                        <th class="py-3 px-2">Master-Feature</th>
-                                        <th class="py-3 px-2 text-center">Status</th>
-                                        <th class="py-3 px-2">Planned Target</th>
-                                        <th class="py-3 px-2 text-right">Feature Rollup Progress</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="milestones-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                    <!-- Populated dynamically -->
-                                </tbody>
-                            </table>
+                        <div class="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500 font-mono flex-shrink-0">
+                            1 Master-Feature = 1 Major Milestone
                         </div>
                     </div>
 
-                    <!-- Right Column: Initiative Risks (40%) -->
-                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm lg:col-span-2 flex flex-col">
-                        <div class="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 class="text-base font-semibold text-slate-900 dark:text-white">Initiative Risks</h3>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">Manually tracked risks & blockers</p>
-                            </div>
-                            <button onclick="openRiskForm()" class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-all flex-shrink-0">
-                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Risk
-                            </button>
-                        </div>
-
-                        <!-- Inline Add-Risk Form (hidden by default) -->
-                        <div id="risk-form" class="hidden mb-4 p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
-                            <input id="risk-title-input" type="text" placeholder="Risk title" class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                            <textarea id="risk-desc-input" placeholder="Description (optional)" rows="2" class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500"></textarea>
-                            <div class="flex gap-2">
-                                <select id="risk-severity-input" class="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                                    <option value="critical">Critical</option>
-                                    <option value="warning" selected>Warning</option>
-                                    <option value="info">Info</option>
-                                </select>
-                                <input id="risk-owner-input" type="text" placeholder="Owner (optional)" class="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                            </div>
-                            <div class="flex gap-2 justify-end pt-1">
-                                <button onclick="closeRiskForm()" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700">Cancel</button>
-                                <button onclick="saveNewRisk()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-700 text-white">Save Risk</button>
-                            </div>
-                        </div>
-
-                        <div id="risks-list-container" class="space-y-2.5 overflow-y-auto max-h-[280px] flex-grow">
-                            <!-- Dynamic risk cards -->
-                        </div>
-
-                        <!-- Risk persistence controls -->
-                        <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                            <span class="text-[10px] text-slate-400 leading-snug">Saved locally in this browser.<br>Export/import to carry risks across dashboard regenerations.</span>
-                            <div class="flex items-center gap-2 flex-shrink-0">
-                                <button onclick="exportRisks()" class="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-medium rounded-lg text-slate-600 dark:text-slate-300">
-                                    <i data-lucide="download" class="w-3 h-3"></i> Export
-                                </button>
-                                <button onclick="document.getElementById('risk-import-input').click()" class="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-medium rounded-lg text-slate-600 dark:text-slate-300">
-                                    <i data-lucide="upload" class="w-3 h-3"></i> Import
-                                </button>
-                                <input id="risk-import-input" type="file" accept="application/json" class="hidden" onchange="importRisksFile(event)" />
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <div id="tab-matrix" class="hidden space-y-6">
-
-                <!-- Filter bar & matrix interactive instructions -->
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div class="space-y-1">
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Features Group Allocation</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Distribution of features across execution groups. **Click a Master-Feature in the left column** to isolate and focus on its features.</p>
-                    </div>
-
-                    <!-- Filter state banner -->
-                    <div class="flex items-center gap-2 text-xs" id="matrix-filter-banner-container">
-                        <!-- Active filters injected dynamically here -->
-                    </div>
-                </div>
-
-                <!-- Swimlane Matrix Grid -->
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full border-collapse text-left text-xs min-w-[900px]">
-                            <thead>
-                                <tr id="matrix-header-row" class="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-850">
-                                    <th class="py-4 px-4 w-[280px] font-semibold text-slate-500 dark:text-slate-400">Master-Feature (Milestone)</th>
-                                    <!-- Group columns injected dynamically based on each Theme's live "Group" field -->
-                                </tr>
-                            </thead>
-                            <tbody id="matrix-swimlane-body" class="divide-y divide-slate-150 dark:divide-slate-800">
-                                <!-- Dynamically populated based on selected initiative & filtering -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Matrix footer explanation and legend -->
-                    <div class="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-150 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
-                        <div class="flex items-center gap-4 flex-wrap">
-                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span> Completed Feature (100%)</span>
-                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span> In Progress Feature (1-99%)</span>
-                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-rose-500"></span> Blocked Feature (Stalled)</span>
-                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-slate-300 dark:bg-slate-600"></span> Planned Feature (0%)</span>
-                        </div>
-                        <span class="text-slate-400 font-medium">Progress indicators are colored dynamically by active status values.</span>
+                    <!-- Milestone Card Grid -->
+                    <div id="milestones-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Populated dynamically -->
                     </div>
                 </div>
 
@@ -410,15 +295,25 @@
             <div id="tab-schedule" class="hidden space-y-6">
 
                 <!-- Filter bar & schedule interactive instructions -->
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div class="space-y-1">
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Master-Feature Delivery Schedule</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Features plotted by their own Planned PI, columns sorted chronologically. **Click a Master-Feature in the left column** to isolate it (synced with Allocation Swimlanes).</p>
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm space-y-4">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="space-y-1">
+                            <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Master-Feature Delivery Schedule</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Features plotted by their own Planned PI, columns sorted chronologically. **Click a Master-Feature in the left column** to isolate it.</p>
+                        </div>
+
+                        <!-- Filter state banner -->
+                        <div class="flex items-center gap-2 text-xs flex-wrap" id="schedule-filter-banner-container">
+                            <!-- Active filters injected dynamically here -->
+                        </div>
                     </div>
 
-                    <!-- Filter state banner (shared state with Allocation Swimlanes) -->
-                    <div class="flex items-center gap-2 text-xs" id="schedule-filter-banner-container">
-                        <!-- Active filters injected dynamically here -->
+                    <!-- Multi-select Group filter -->
+                    <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex-shrink-0">Filter by Group:</span>
+                        <div id="schedule-group-filter-container" class="flex flex-wrap gap-1.5">
+                            <!-- Dynamic multi-select group toggle pills -->
+                        </div>
                     </div>
                 </div>
 
@@ -446,7 +341,7 @@
                             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-rose-500"></span> Blocked Feature (Stalled)</span>
                             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-slate-300 dark:bg-slate-600"></span> Planned Feature (0%)</span>
                         </div>
-                        <span class="text-slate-400 font-medium">Columns are each Feature's own Planned PI, sorted chronologically left to right (a "TBD" column collects unscheduled features).</span>
+                        <span class="text-slate-400 font-medium">Columns are each Feature's own Planned PI, sorted chronologically left to right (a "TBD" column collects unscheduled features). Health badges: <span class="text-emerald-500 font-semibold">Good</span> / <span class="text-amber-500 font-semibold">Warning</span> / <span class="text-rose-500 font-semibold">At Risk</span>.</span>
                     </div>
                 </div>
 
@@ -536,13 +431,15 @@
         const PAYLOAD = JSON.parse(document.getElementById("initiative-data").textContent);
         const INITIATIVE_DATA = PAYLOAD.initiatives;
         // Optional: { "<PlannedPI label>": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" } }, shared across all initiatives.
-        // Powers the "Planned PI ending soon/already ended" Automated Insights below - PIs not present here are skipped
-        // for deadline checks (never guessed), though they still participate in status/progress mismatch checks.
+        // Powers the "Planned PI ending soon/already ended" Automated Insights and the per-item Health badges below -
+        // PIs not present here are skipped for those checks (never guessed), though status/progress mismatch checks
+        // still run regardless.
         const PI_CALENDAR = PAYLOAD.piCalendar || {};
 
         // Active Application State tracking variables
         let currentInitiativeKey = Object.keys(INITIATIVE_DATA)[0];
-        let activeMasterFeatureFilter = null; // Filter for swimlanes
+        let activeMasterFeatureFilter = null; // Isolates one Master-Feature row on the PI Delivery Schedule
+        let activeGroupFilters = new Set(); // Multi-select Group filter on the PI Delivery Schedule; empty = show all groups
 
         // Dom components pointers
         const elInitiativeSelector = document.getElementById("initiative-selector");
@@ -553,15 +450,12 @@
         const elStatTimelineRange = document.getElementById("stat-timeline-range");
         const elStatTimelineTarget = document.getElementById("stat-timeline-target");
         const elStatTimelineVariance = document.getElementById("stat-timeline-variance");
-        const elMilestonesTableBody = document.getElementById("milestones-table-body");
-        const elMatrixSwimlaneBody = document.getElementById("matrix-swimlane-body");
+        const elMilestonesContainer = document.getElementById("milestones-grid");
         const elScheduleBody = document.getElementById("schedule-body");
+        const elScheduleGroupFilterContainer = document.getElementById("schedule-group-filter-container");
         const elCsvDrawer = document.getElementById("csv-drawer");
         const elCsvRawTextarea = document.getElementById("csv-raw-textarea");
-        const elFilterBannerContainer = document.getElementById("matrix-filter-banner-container");
         const elScheduleFilterBannerContainer = document.getElementById("schedule-filter-banner-container");
-        const elRisksListContainer = document.getElementById("risks-list-container");
-        const elRiskForm = document.getElementById("risk-form");
         const elInsightsListContainer = document.getElementById("insights-list-container");
         const elInsightsCountBadge = document.getElementById("insights-count-badge");
         const elInsightsDetailContainer = document.getElementById("insights-detail-container");
@@ -601,6 +495,85 @@
             document.documentElement.classList.remove('dark');
         }
 
+        // --- Shared Planned-PI / date helpers ---
+        // Used by the Health badges, the Automated Insights engine, and the Initiative-level Delivery-Target check below.
+        const PI_DEADLINE_SOON_DAYS = 14; // flag a Planned PI as "ending soon" once its end date is within this many days
+
+        function slug(text) {
+            return String(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        }
+
+        // Resolve a Planned PI label (e.g. "27-Q1") to its known {start, end} ISO dates from PI_CALENDAR, if present.
+        // Returns null for unresolvable labels ("TBD", or any PI the calendar simply doesn't cover) - deadline checks
+        // skip those rather than guessing a date.
+        function resolvePiCalendarEntry(piLabel) {
+            return PI_CALENDAR[piLabel] || null;
+        }
+
+        function daysBetween(fromDate, toDate) {
+            const msPerDay = 24 * 60 * 60 * 1000;
+            return Math.round((toDate.getTime() - fromDate.getTime()) / msPerDay);
+        }
+
+        // Jira's "Delivery Target" field on the Initiative comes through as a "YY-MM" label (e.g. "26-12" = December
+        // 2026). Resolve it to that month's last calendar day for the off-track comparison below. Returns null for
+        // anything that doesn't match the pattern ("TBD", etc.) - the off-track check simply skips those rather than guessing.
+        function parseDeliveryTargetEndDate(text) {
+            if (!text) return null;
+            const match = /^(\d{2})-(\d{2})$/.exec(text.trim());
+            if (!match) return null;
+            const year = 2000 + parseInt(match[1], 10);
+            const month = parseInt(match[2], 10);
+            if (month < 1 || month > 12) return null;
+            return new Date(year, month, 0); // day 0 of next month = last day of this month
+        }
+
+        // Detects whether the Initiative's own latest Planned PI (stats.timelineTarget, resolved via PI_CALENDAR) ends
+        // later than its committed Jira Delivery Target (data.timelineRange) - i.e. delivery has slipped past what was
+        // committed. Returns null (no verdict) whenever either date can't be resolved, rather than guessing.
+        function detectTimelineOffTrack(data) {
+            const piLabel = data.stats && data.stats.timelineTarget;
+            if (!piLabel) return null;
+            const piEntry = resolvePiCalendarEntry(piLabel);
+            if (!piEntry || !piEntry.end) return null;
+            const deliveryTargetEnd = parseDeliveryTargetEndDate(data.timelineRange);
+            if (!deliveryTargetEnd) return null;
+            const piEnd = new Date(piEntry.end + "T00:00:00");
+            if (piEnd <= deliveryTargetEnd) return null;
+            return { piLabel, daysLate: daysBetween(deliveryTargetEnd, piEnd) };
+        }
+
+        // --- Health Indicator ---
+        // A lightweight, always-visible traffic-light badge per Master-Feature/Feature (distinct from the Automated
+        // Insights panel): "At Risk" (red) once the item's own Planned PI has already ended while it isn't Completed,
+        // or the item is Blocked; "Warning" (amber) once that PI is ending soon (within PI_DEADLINE_SOON_DAYS) while
+        // still open; "Good" (green) otherwise. Purely derived, recomputed fresh on every render.
+        const HEALTH_STYLES = {
+            "at-risk": { label: "At Risk", badge: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900", dot: "bg-rose-500" },
+            "warning": { label: "Warning", badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
+            "good": { label: "Good", badge: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" }
+        };
+
+        function computeHealth(piLabel, status, today) {
+            if (status === "Completed") return "good";
+            if (status === "Blocked") return "at-risk";
+
+            const entry = resolvePiCalendarEntry(piLabel);
+            if (!entry || !entry.end) return "good"; // no PI dates to judge by - don't guess
+
+            const end = new Date(entry.end + "T00:00:00");
+            const daysLeft = daysBetween(today, end);
+
+            if (daysLeft < 0) return "at-risk"; // Planned PI already ended and item still open - late
+            if (daysLeft <= PI_DEADLINE_SOON_DAYS) return "warning"; // PI ending soon and item hasn't finished yet
+            return "good";
+        }
+
+        function healthBadgeHtml(level, extraClass) {
+            const style = HEALTH_STYLES[level] || HEALTH_STYLES.good;
+            return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${style.badge} ${extraClass || ''} flex-shrink-0"><span class="w-1.5 h-1.5 rounded-full ${style.dot}"></span>${style.label}</span>`;
+        }
+
         // Master Rendering Router
         function renderDashboard() {
             const data = INITIATIVE_DATA[currentInitiativeKey];
@@ -628,7 +601,7 @@
 
             // Status Sync is normally the authored stats.timelineVariance, but gets auto-overridden to "Off Track"
             // whenever the Initiative's own latest Planned PI (stats.timelineTarget) resolves - via PI_CALENDAR - to a
-            // later date than its Jira Timeframe field (data.timelineRange, e.g. "July 2026") - see detectTimelineOffTrack().
+            // later date than its Jira Delivery Target field (data.timelineRange, e.g. "26-12") - see detectTimelineOffTrack().
             const timelineMismatch = detectTimelineOffTrack(data);
             const effectiveVariance = timelineMismatch ? "Off Track" : data.stats.timelineVariance;
             elStatTimelineVariance.innerText = effectiveVariance;
@@ -642,11 +615,10 @@
 
             // Render Dynamic components
             renderGroupWorkloadDistribution(data.masterFeatures);
-            renderMilestonesTable(data.masterFeatures);
-            renderMatrixSwimlanes(data.masterFeatures);
+            renderMilestonesGrid(data.masterFeatures);
+            renderGroupFilterPills(data.masterFeatures);
             renderScheduleMatrix(data.masterFeatures);
             updateFilterBanners();
-            renderRisks();
             renderInsights(data);
 
             // Trigger lucide icon compilation
@@ -757,255 +729,83 @@
             }).join("");
         }
 
-        // Render Milestones (Master-Features) Summary table
-        function renderMilestonesTable(masterFeatures) {
-            elMilestonesTableBody.innerHTML = "";
+        // Shared status pill classes (Master-Feature milestone cards use these; Feature cards have their own richer variant)
+        function statusPillClasses(status) {
+            if (status === "Completed") return "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800";
+            if (status === "In Progress") return "bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900";
+            if (status === "Blocked") return "bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900";
+            return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700";
+        }
 
-            masterFeatures.forEach(mf => {
-                // Get progress bar color directly derived from status
-                let statusBadge = "px-2 py-0.5 rounded text-[10px] font-bold inline-block ";
-                let progressColor = "bg-slate-300";
+        function progressRingColorClass(status) {
+            if (status === "Completed") return "text-emerald-500";
+            if (status === "In Progress") return "text-amber-500";
+            if (status === "Blocked") return "text-rose-500";
+            return "text-slate-300 dark:text-slate-600";
+        }
 
-                if (mf.status === "Completed") {
-                    statusBadge += "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800";
-                    progressColor = "bg-emerald-500";
-                } else if (mf.status === "In Progress") {
-                    statusBadge += "bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900";
-                    progressColor = "bg-amber-500";
-                } else if (mf.status === "Blocked") {
-                    statusBadge += "bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-450 border border-rose-200 dark:border-rose-900";
-                    progressColor = "bg-rose-500";
-                } else {
-                    statusBadge += "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700";
-                    progressColor = "bg-slate-400 dark:bg-slate-600";
-                }
+        function healthAccentClass(level) {
+            if (level === "at-risk") return "bg-rose-500";
+            if (level === "warning") return "bg-amber-500";
+            return "bg-emerald-500";
+        }
 
-                const tr = document.createElement("tr");
-                tr.className = "border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors";
-                tr.innerHTML = `
-                    <td class="py-4 px-2 font-semibold text-slate-800 dark:text-slate-200 max-w-xs md:max-w-md">
-                        ${mf.name}
-                    </td>
-                    <td class="py-4 px-2 text-center">
-                        <span class="${statusBadge}">${mf.status}</span>
-                    </td>
-                    <td class="py-4 px-2 font-mono text-slate-500 dark:text-slate-400 font-medium">
-                        ${mf.targetDate}
-                    </td>
-                    <td class="py-4 px-2 text-right">
-                        <div class="flex items-center justify-end gap-2.5">
-                            <span class="font-mono text-slate-700 dark:text-slate-300 font-bold">${mf.progress}%</span>
-                            <div class="w-20 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                <div class="${progressColor} h-1.5 rounded-full" style="width: ${mf.progress}%;"></div>
+        // Render Milestones (Master-Features) as a responsive card grid, each with a Health badge and a circular progress ring
+        function renderMilestonesGrid(masterFeatures) {
+            const today = new Date();
+            const ringRadius = 24;
+            const circumference = 2 * Math.PI * ringRadius;
+
+            elMilestonesContainer.innerHTML = masterFeatures.map(mf => {
+                const health = computeHealth(mf.targetDate, mf.status, today);
+                const clampedProgress = Math.min(Math.max(mf.progress, 0), 100);
+                const offset = circumference * (1 - clampedProgress / 100);
+
+                return `
+                    <div class="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 pl-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
+                        <div class="absolute top-0 left-0 w-1.5 h-full ${healthAccentClass(health)}"></div>
+                        <div class="flex items-start justify-between gap-2 mb-3">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Master-Feature</span>
+                            ${healthBadgeHtml(health)}
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug mb-4 line-clamp-2 min-h-[2.5rem]">${mf.name}</h4>
+                        <div class="flex items-center gap-3.5">
+                            <div class="relative w-14 h-14 flex-shrink-0">
+                                <svg class="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                                    <circle cx="28" cy="28" r="${ringRadius}" fill="none" stroke-width="5" class="text-slate-100 dark:text-slate-800" stroke="currentColor" />
+                                    <circle cx="28" cy="28" r="${ringRadius}" fill="none" stroke-width="5" stroke-linecap="round" class="${progressRingColorClass(mf.status)} transition-all duration-500" stroke="currentColor" stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" />
+                                </svg>
+                                <span class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-slate-700 dark:text-slate-200">${mf.progress}%</span>
+                            </div>
+                            <div class="flex-1 space-y-1.5 min-w-0">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold inline-block ${statusPillClasses(mf.status)}">${mf.status}</span>
+                                <div class="flex items-center gap-1 text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                                    <i data-lucide="calendar" class="w-3 h-3 flex-shrink-0"></i> Target ${mf.targetDate}
+                                </div>
+                                <div class="flex items-center gap-1 text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                                    <i data-lucide="layers" class="w-3 h-3 flex-shrink-0"></i> ${mf.features.length} Feature${mf.features.length === 1 ? '' : 's'}
+                                </div>
                             </div>
                         </div>
-                    </td>
-                `;
-                elMilestonesTableBody.appendChild(tr);
-            });
-        }
-
-        // --- Manually-tracked Initiative Risks ---
-        // Persisted in localStorage keyed by initiative id (not file content), so risks survive this dashboard file being
-        // regenerated with fresh Jira data as long as the initiative key and file path stay the same. Export/Import lets you
-        // carry risks across machines or if the file path/origin ever changes.
-        function risksStorageKey(key) {
-            return `pm_blueprint_risks_${key}`;
-        }
-
-        function loadRisksForCurrentInitiative() {
-            const stored = localStorage.getItem(risksStorageKey(currentInitiativeKey));
-            if (stored) {
-                try {
-                    return JSON.parse(stored);
-                } catch (e) {
-                    // Corrupted storage - fall through to seed data below
-                }
-            }
-            const seed = INITIATIVE_DATA[currentInitiativeKey].risks;
-            return Array.isArray(seed) ? seed : [];
-        }
-
-        function saveRisksForCurrentInitiative(risks) {
-            localStorage.setItem(risksStorageKey(currentInitiativeKey), JSON.stringify(risks));
-        }
-
-        function renderRisks() {
-            const risks = loadRisksForCurrentInitiative();
-            elRisksListContainer.innerHTML = "";
-
-            if (risks.length === 0) {
-                elRisksListContainer.innerHTML = `<p class="text-slate-300 dark:text-slate-700 italic text-xs text-center font-mono py-8">No risks logged yet. Click "Add Risk" to log one.</p>`;
-                return;
-            }
-
-            const severityStyles = {
-                critical: { badge: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900", dot: "bg-rose-500" },
-                warning: { badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
-                info: { badge: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400", dot: "bg-slate-400" }
-            };
-
-            risks.slice().reverse().forEach(risk => {
-                const style = severityStyles[risk.severity] || severityStyles.info;
-                const card = document.createElement("div");
-                card.className = "p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 flex flex-col gap-1.5";
-                card.innerHTML = `
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0"></span>
-                            <h5 class="font-semibold text-slate-800 dark:text-slate-100 text-xs leading-snug">${risk.title}</h5>
-                        </div>
-                        <button onclick="deleteRisk(${risk.id})" class="text-slate-300 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 flex-shrink-0">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        </button>
-                    </div>
-                    ${risk.description ? `<p class="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">${risk.description}</p>` : ''}
-                    <div class="flex items-center justify-between pt-1">
-                        <span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${style.badge}">${risk.severity}</span>
-                        <span class="text-[10px] text-slate-400 font-mono">${risk.owner ? 'Owner: ' + risk.owner : ''}</span>
                     </div>
                 `;
-                elRisksListContainer.appendChild(card);
-            });
-
-            lucide.createIcons();
-        }
-
-        function openRiskForm() {
-            elRiskForm.classList.remove("hidden");
-            document.getElementById("risk-title-input").focus();
-        }
-
-        function closeRiskForm() {
-            elRiskForm.classList.add("hidden");
-            document.getElementById("risk-title-input").value = "";
-            document.getElementById("risk-desc-input").value = "";
-            document.getElementById("risk-owner-input").value = "";
-            document.getElementById("risk-severity-input").value = "warning";
-        }
-
-        function saveNewRisk() {
-            const title = document.getElementById("risk-title-input").value.trim();
-            if (!title) {
-                toastAlert("Please enter a risk title before saving.");
-                return;
-            }
-            const risk = {
-                id: Date.now(),
-                title: title,
-                description: document.getElementById("risk-desc-input").value.trim(),
-                severity: document.getElementById("risk-severity-input").value,
-                owner: document.getElementById("risk-owner-input").value.trim(),
-                dateAdded: new Date().toISOString()
-            };
-            const risks = loadRisksForCurrentInitiative();
-            risks.push(risk);
-            saveRisksForCurrentInitiative(risks);
-            closeRiskForm();
-            renderRisks();
-            toastAlert("Risk logged and saved locally.", "success");
-        }
-
-        function deleteRisk(id) {
-            const risks = loadRisksForCurrentInitiative().filter(r => r.id !== id);
-            saveRisksForCurrentInitiative(risks);
-            renderRisks();
-        }
-
-        // Download the current initiative's risks as a JSON file, so they can be re-imported after this dashboard is regenerated with fresh Jira data
-        function exportRisks() {
-            const risks = loadRisksForCurrentInitiative();
-            const blob = new Blob([JSON.stringify(risks, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `risks_${currentInitiativeKey}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            toastAlert(`Exported ${risks.length} risk(s) to file.`, "success");
-        }
-
-        // Import previously exported risks - use this after regenerating the dashboard to restore risks logged earlier
-        function importRisksFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const imported = JSON.parse(e.target.result);
-                    if (!Array.isArray(imported)) throw new Error("File must contain a JSON array of risks.");
-                    saveRisksForCurrentInitiative(imported);
-                    renderRisks();
-                    toastAlert(`Imported ${imported.length} risk(s) into this dashboard.`, "success");
-                } catch (err) {
-                    alert("Failed to import risks: " + err.message);
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = "";
+            }).join("");
         }
 
         // --- Automated Insights Engine ---
-        // Detects status/progress mismatches and Planned-PI deadline risks purely from masterFeatures/features data plus
-        // PI_CALENDAR. Always recomputed fresh on every render using the real current date (new Date()), so re-opening
-        // an old dashboard file still shows accurate "days remaining"/"overdue" figures - nothing here is persisted.
+        // Detects status/progress mismatches, Planned-PI deadline risks, and Initiative timeline slippage purely from
+        // masterFeatures/features/timelineRange data plus PI_CALENDAR. Always recomputed fresh on every render using
+        // the real current date (new Date()), so re-opening an old dashboard file still shows accurate "days
+        // remaining"/"overdue" figures - nothing here is persisted.
         //
         // Findings are organized into "insight groups": each group has a short summary title, a severity, and the full
         // list of items (Feature/Master-Feature) behind it. PI-deadline findings are grouped by (Planned PI, ended-vs-
         // soon) so e.g. "6 items still open for 26-Q2" is ONE group/card, not six - the Executive Summary tab shows one
         // compact card per group; the Insights tab lists every group's full item table.
-        const PI_DEADLINE_SOON_DAYS = 14; // flag a Planned PI as "ending soon" once its end date is within this many days
-
         const INSIGHT_SEVERITY_STYLES = {
             critical: { badge: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900", dot: "bg-rose-500", label: "Critical" },
             warning: { badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500", label: "Warning" }
         };
-
-        function slug(text) {
-            return String(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-        }
-
-        // Resolve a Planned PI label (e.g. "27-Q1") to its known {start, end} ISO dates from PI_CALENDAR, if present.
-        // Returns null for unresolvable labels ("TBD", or any PI the calendar simply doesn't cover) - deadline checks
-        // skip those rather than guessing a date.
-        function resolvePiCalendarEntry(piLabel) {
-            return PI_CALENDAR[piLabel] || null;
-        }
-
-        function daysBetween(fromDate, toDate) {
-            const msPerDay = 24 * 60 * 60 * 1000;
-            return Math.round((toDate.getTime() - fromDate.getTime()) / msPerDay);
-        }
-
-        // Jira's "Timeframe" field on the Initiative comes through as a "<Month name> <YYYY>" label (e.g. "July 2026").
-        // Resolve it to that month's last calendar day for the off-track comparison below. Returns null for anything
-        // that doesn't match the pattern ("TBD", quarters, etc.) - the off-track check simply skips those rather than guessing.
-        const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-        function parseTimeframeEndDate(text) {
-            if (!text) return null;
-            const match = /^([A-Za-z]+)\s+(\d{4})$/.exec(text.trim());
-            if (!match) return null;
-            const monthIndex = MONTH_NAMES.indexOf(match[1].toLowerCase());
-            if (monthIndex === -1) return null;
-            return new Date(parseInt(match[2], 10), monthIndex + 1, 0); // day 0 of next month = last day of this month
-        }
-
-        // Detects whether the Initiative's own latest Planned PI (stats.timelineTarget, resolved via PI_CALENDAR) ends
-        // later than its committed Jira Timeframe (data.timelineRange) - i.e. delivery has slipped past what was
-        // committed. Returns null (no verdict) whenever either date can't be resolved, rather than guessing.
-        function detectTimelineOffTrack(data) {
-            const piLabel = data.stats && data.stats.timelineTarget;
-            if (!piLabel) return null;
-            const piEntry = resolvePiCalendarEntry(piLabel);
-            if (!piEntry || !piEntry.end) return null;
-            const timeframeEnd = parseTimeframeEndDate(data.timelineRange);
-            if (!timeframeEnd) return null;
-            const piEnd = new Date(piEntry.end + "T00:00:00");
-            if (piEnd <= timeframeEnd) return null;
-            return { piLabel, daysLate: daysBetween(timeframeEnd, piEnd) };
-        }
 
         // One group per Master-Feature whose own status looks stale relative to its features' actual state
         function collectMismatchGroups(masterFeatures) {
@@ -1082,20 +882,20 @@
             });
         }
 
-        // Single group (if any) flagging the Initiative itself as Off Track because its latest Planned PI has slipped past its Jira Timeframe
+        // Single group (if any) flagging the Initiative itself as Off Track because its latest Planned PI has slipped past its Jira Delivery Target
         function collectTimelineMismatchGroup(data) {
             const mismatch = detectTimelineOffTrack(data);
             if (!mismatch) return [];
             return [{
                 id: `timeline-off-track-${slug(data.title)}`,
                 severity: "critical",
-                title: `Latest Planned PI (${mismatch.piLabel}) ends ${mismatch.daysLate} day${mismatch.daysLate === 1 ? '' : 's'} after the Initiative's Jira Timeframe (${data.timelineRange}) - marked Off Track`,
-                items: [{ name: data.title, kind: "Initiative", status: "Off Track", progress: null, note: `PI ${mismatch.piLabel} vs Timeframe ${data.timelineRange}` }]
+                title: `Latest Planned PI (${mismatch.piLabel}) ends ${mismatch.daysLate} day${mismatch.daysLate === 1 ? '' : 's'} after the Initiative's Jira Delivery Target (${data.timelineRange}) - marked Off Track`,
+                items: [{ name: data.title, kind: "Initiative", status: "Off Track", progress: null, note: `PI ${mismatch.piLabel} vs Delivery Target ${data.timelineRange}` }]
             }];
         }
 
         // Full insight sweep across one initiative: Master-Feature/Feature mismatches, PI deadline risk, and the
-        // Initiative-level Timeframe-vs-Planned-PI check, sorted critical-first
+        // Initiative-level Delivery-Target-vs-Planned-PI check, sorted critical-first
         function computeInsightGroups(data) {
             const groups = [
                 ...collectMismatchGroups(data.masterFeatures),
@@ -1198,8 +998,9 @@
             }, 50);
         }
 
-        // Build the small feature card shared by Allocation Swimlanes (grouped by Group) and PI Delivery Schedule (grouped by Planned PI).
-        // footerLabel is the secondary info shown bottom-left of the card - the Group's own PI date in the swimlanes, the Feature's Group in the schedule.
+        // Build the small feature card used in the PI Delivery Schedule (one card per Feature within a Master-Feature
+        // x Planned-PI cell). footerLabel shows the Feature's own Group (since the column already encodes its Planned
+        // PI). Includes a Health badge computed from the Feature's own status + Planned PI.
         function buildFeatureCardHtml(feat, footerLabel) {
             let statusColorClass = "bg-slate-300";
             let borderClass = "border-slate-200 dark:border-slate-800";
@@ -1223,10 +1024,13 @@
                 statusBadgeStyle = "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900";
             }
 
+            const health = computeHealth(feat.date, feat.status, new Date());
+
             return `
                 <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all">
-                    <div class="space-y-1">
+                    <div class="flex items-start justify-between gap-1.5">
                         <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${feat.name}</h5>
+                        ${healthBadgeHtml(health)}
                     </div>
                     <div class="pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-1 mt-2">
                         <span class="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 dark:bg-slate-800/80 px-1 rounded">${footerLabel || 'TBD'}</span>
@@ -1239,72 +1043,49 @@
             `;
         }
 
-        // Render primary Division/Group Allocation matrix swimlanes (columns are derived live from each Theme's "Group" field)
-        function renderMatrixSwimlanes(masterFeatures) {
+        // Render the multi-select Group filter pills for the PI Delivery Schedule (click to toggle; several can be active at once)
+        function renderGroupFilterPills(masterFeatures) {
             const groupNames = getDistinctGroups(masterFeatures);
 
-            // Build the group column headers dynamically to match whatever groups actually exist in the live data
-            const headerRow = document.getElementById("matrix-header-row");
-            headerRow.innerHTML = `<th class="py-4 px-4 w-[280px] font-semibold text-slate-500 dark:text-slate-400">Master-Feature (Milestone)</th>` +
-                groupNames.map(g => `<th class="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400 text-center border-l border-slate-150 dark:border-slate-850">${g} Group</th>`).join("");
+            if (groupNames.length === 0) {
+                elScheduleGroupFilterContainer.innerHTML = `<span class="text-slate-300 dark:text-slate-700 text-[11px] italic">No groups found in this initiative</span>`;
+                return;
+            }
 
-            elMatrixSwimlaneBody.innerHTML = "";
-
-            masterFeatures.forEach(mf => {
-                // If filtering is enabled and this doesn't match, skip rendering it
-                if (activeMasterFeatureFilter && mf.name !== activeMasterFeatureFilter) {
-                    return;
-                }
-
-                const tr = document.createElement("tr");
-                // Class configuration with click handlers on the row to toggle filters
-                tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-all duration-200";
-
-                let cellsHtml = "";
-
-                groupNames.forEach(divName => {
-                    const matchedFeatures = mf.features.filter(f => f.group === divName);
-
-                    if (matchedFeatures.length === 0) {
-                        cellsHtml += `
-                            <td class="py-4 px-3 border-l border-slate-150 dark:border-slate-850 bg-slate-50/20 dark:bg-slate-900/10 align-top">
-                                <p class="text-slate-300 dark:text-slate-700 italic text-[10px] text-center font-mono py-6">No Allocations</p>
-                            </td>
-                        `;
-                        return;
-                    }
-
-                    // Render multiple cards if multiple features are allocated to the same group under this Master-Feature
-                    const featuresCardsHtml = matchedFeatures.map(feat => buildFeatureCardHtml(feat, feat.date)).join("");
-
-                    cellsHtml += `
-                        <td class="py-3 px-3 border-l border-slate-150 dark:border-slate-850 align-top space-y-2">
-                            ${featuresCardsHtml}
-                        </td>
-                    `;
-                });
-
-                const isFiltered = activeMasterFeatureFilter === mf.name;
-                const highlightStyle = isFiltered
-                    ? "bg-brand-50/40 dark:bg-brand-950/10 border-l-4 border-l-brand-500"
-                    : "";
-
-                tr.innerHTML = `
-                    <td class="py-4 px-4 font-semibold text-slate-800 dark:text-slate-100 text-xs align-middle leading-snug max-w-[280px] cursor-pointer group ${highlightStyle}" onclick="toggleRowFilter('${mf.name}')">
-                        <div class="space-y-1.5">
-                            <span class="text-brand-600 dark:text-brand-400 font-bold text-[10px] tracking-wider uppercase block">Master-Feature</span>
-                            <span class="hover:text-brand-500 font-bold leading-normal block transition-colors">${mf.name}</span>
-                            <div class="flex items-center gap-1.5 mt-2 font-mono text-[9px] text-slate-400 font-bold uppercase">
-                                <span class="bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200 dark:border-slate-800">Target ${mf.targetDate}</span>
-                                <span class="text-brand-500 font-bold hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Isolate row</span>
-                            </div>
-                        </div>
-                    </td>
-                    ${cellsHtml}
-                `;
-
-                elMatrixSwimlaneBody.appendChild(tr);
+            const pills = groupNames.map(g => {
+                const isActive = activeGroupFilters.has(g);
+                const color = groupColor(g, groupNames);
+                const classes = isActive
+                    ? `${color.bar} text-white border-transparent shadow-sm`
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600";
+                return `<button onclick="toggleGroupFilter('${g}')" class="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${classes}">${g}</button>`;
             });
+
+            if (activeGroupFilters.size > 0) {
+                pills.push(`<button onclick="clearGroupFilters()" class="px-2.5 py-1 rounded-full text-[11px] font-semibold border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-all">Clear</button>`);
+            }
+
+            elScheduleGroupFilterContainer.innerHTML = pills.join("");
+        }
+
+        function toggleGroupFilter(groupName) {
+            if (activeGroupFilters.has(groupName)) {
+                activeGroupFilters.delete(groupName);
+            } else {
+                activeGroupFilters.add(groupName);
+            }
+            renderDashboard();
+        }
+
+        function clearGroupFilters() {
+            activeGroupFilters.clear();
+            renderDashboard();
+        }
+
+        function clearAllScheduleFilters() {
+            activeMasterFeatureFilter = null;
+            activeGroupFilters.clear();
+            renderDashboard();
         }
 
         // Convert a "YY-Qn" Planned PI label into a sortable ordinal (fiscalYear*4 + (quarter-1)); returns null for
@@ -1329,8 +1110,10 @@
             return known.concat(unknown);
         }
 
-        // Render the Master-Feature x Planned-PI delivery schedule (columns are each Feature's own "PlannedPI" value, chronologically sorted)
+        // Render the Master-Feature x Planned-PI delivery schedule (columns are each Feature's own "PlannedPI" value,
+        // chronologically sorted). Rows respect both the row-isolate filter and the multi-select Group filter.
         function renderScheduleMatrix(masterFeatures) {
+            const today = new Date();
             const piColumns = getSortedPlannedPIs(masterFeatures);
 
             const headerRow = document.getElementById("schedule-header-row");
@@ -1344,13 +1127,19 @@
                     return;
                 }
 
+                // Restrict to features in the selected groups (empty selection = no restriction); skip the whole row if nothing matches
+                const visibleFeatures = mf.features.filter(f => activeGroupFilters.size === 0 || activeGroupFilters.has(f.group));
+                if (activeGroupFilters.size > 0 && visibleFeatures.length === 0) {
+                    return;
+                }
+
                 const tr = document.createElement("tr");
                 tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-all duration-200";
 
                 let cellsHtml = "";
 
                 piColumns.forEach(pi => {
-                    const matchedFeatures = mf.features.filter(f => f.date === pi);
+                    const matchedFeatures = visibleFeatures.filter(f => f.date === pi);
 
                     if (matchedFeatures.length === 0) {
                         cellsHtml += `
@@ -1375,11 +1164,15 @@
                 const highlightStyle = isFiltered
                     ? "bg-brand-50/40 dark:bg-brand-950/10 border-l-4 border-l-brand-500"
                     : "";
+                const mfHealth = computeHealth(mf.targetDate, mf.status, today);
 
                 tr.innerHTML = `
                     <td class="py-4 px-4 font-semibold text-slate-800 dark:text-slate-100 text-xs align-middle leading-snug max-w-[280px] cursor-pointer group ${highlightStyle}" onclick="toggleRowFilter('${mf.name}')">
                         <div class="space-y-1.5">
-                            <span class="text-brand-600 dark:text-brand-400 font-bold text-[10px] tracking-wider uppercase block">Master-Feature</span>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-brand-600 dark:text-brand-400 font-bold text-[10px] tracking-wider uppercase block">Master-Feature</span>
+                                ${healthBadgeHtml(mfHealth)}
+                            </div>
                             <span class="hover:text-brand-500 font-bold leading-normal block transition-colors">${mf.name}</span>
                             <div class="flex items-center gap-1.5 mt-2 font-mono text-[9px] text-slate-400 font-bold uppercase">
                                 <span class="bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200 dark:border-slate-800">Target ${mf.targetDate}</span>
@@ -1394,28 +1187,42 @@
             });
         }
 
-        // Update the "active filter" banners shared by Allocation Swimlanes and PI Delivery Schedule (same activeMasterFeatureFilter state)
+        // Update the "active filter" banner for the PI Delivery Schedule - shows chips for the row-isolate filter and/or the Group filter
         function updateFilterBanners() {
-            [elFilterBannerContainer, elScheduleFilterBannerContainer].forEach(banner => {
-                if (!banner) return;
-                if (activeMasterFeatureFilter) {
-                    banner.innerHTML = `
-                        <span class="px-2.5 py-1 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-brand-200 dark:border-brand-900">
-                            Isolating Master-Feature: <strong class="truncate max-w-[180px]">${activeMasterFeatureFilter.replace("Master-Feature: ", "")}</strong>
-                            <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-brand-500 hover:text-brand-700"><i data-lucide="x" class="w-3.5 h-3.5 inline"></i></button>
-                        </span>
-                        <button onclick="clearMatrixFilter(); event.stopPropagation();" class="text-xs text-slate-400 hover:text-slate-600 underline">Show All</button>
-                    `;
-                } else {
-                    banner.innerHTML = `
-                        <span class="text-slate-400 text-xs italic">All Master-Feature Rows Visible</span>
-                    `;
-                }
-            });
+            const banner = elScheduleFilterBannerContainer;
+            if (!banner) return;
+
+            const chips = [];
+
+            if (activeMasterFeatureFilter) {
+                chips.push(`
+                    <span class="px-2.5 py-1 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-brand-200 dark:border-brand-900">
+                        Isolating: <strong class="truncate max-w-[180px]">${activeMasterFeatureFilter.replace("Master-Feature: ", "")}</strong>
+                        <button onclick="clearScheduleRowFilter(); event.stopPropagation();" class="text-brand-500 hover:text-brand-700"><i data-lucide="x" class="w-3.5 h-3.5 inline"></i></button>
+                    </span>
+                `);
+            }
+
+            if (activeGroupFilters.size > 0) {
+                chips.push(`
+                    <span class="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-900">
+                        Groups: <strong class="truncate max-w-[220px]">${Array.from(activeGroupFilters).join(", ")}</strong>
+                        <button onclick="clearGroupFilters(); event.stopPropagation();" class="text-indigo-500 hover:text-indigo-700"><i data-lucide="x" class="w-3.5 h-3.5 inline"></i></button>
+                    </span>
+                `);
+            }
+
+            if (chips.length === 0) {
+                chips.push(`<span class="text-slate-400 text-xs italic">All Master-Feature Rows &amp; Groups Visible</span>`);
+            } else {
+                chips.push(`<button onclick="clearAllScheduleFilters(); event.stopPropagation();" class="text-xs text-slate-400 hover:text-slate-600 underline">Show All</button>`);
+            }
+
+            banner.innerHTML = chips.join("");
             lucide.createIcons();
         }
 
-        // Toggle row isolates
+        // Toggle row isolate on the PI Delivery Schedule
         function toggleRowFilter(masterFeatureName) {
             if (activeMasterFeatureFilter === masterFeatureName) {
                 activeMasterFeatureFilter = null; // Clear if clicked again
@@ -1423,10 +1230,10 @@
                 activeMasterFeatureFilter = masterFeatureName;
             }
             renderDashboard();
-            toastAlert(`Filtered Allocation matrix by row.`);
+            toastAlert(`Filtered Delivery Schedule by row.`);
         }
 
-        function clearMatrixFilter() {
+        function clearScheduleRowFilter() {
             activeMasterFeatureFilter = null;
             renderDashboard();
         }
@@ -1434,14 +1241,15 @@
         // Switch Initiative dropdown selector state
         function changeInitiative(key) {
             currentInitiativeKey = key;
-            activeMasterFeatureFilter = null; // Clear active matrix isolates on initiative hop
+            activeMasterFeatureFilter = null; // Clear active row isolate on initiative hop
+            activeGroupFilters.clear(); // Clear active Group filter on initiative hop
             elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
             renderDashboard();
             toastAlert(`Switched Workspace context to ${INITIATIVE_DATA[key].title}`);
         }
 
         // Switch main content view tabs
-        const TAB_NAMES = ["snapshot", "matrix", "schedule", "insights"];
+        const TAB_NAMES = ["snapshot", "schedule", "insights"];
         const TAB_BTN_ACTIVE_CLASS = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
         const TAB_BTN_INACTIVE_CLASS = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
 

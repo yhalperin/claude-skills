@@ -14,14 +14,13 @@
       "statusColor": "emerald",
       "scope": "TBD",
       "horizon": "Target 27-Q1",
-      "timelineRange": "July 2026",
+      "timelineRange": "26-07",
       "stats": {
         "totalFeatures": 14,
         "completedFeatures": 5,
         "timelineTarget": "27-Q1",
         "timelineVariance": "On Schedule"
       },
-      "risks": [],
       "masterFeatures": [
         {
           "name": "Master-Feature: Priv Cloud centralization (SHLD-28144)",
