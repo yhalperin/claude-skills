@@ -78,11 +78,11 @@ Optional top-level map from a Planned PI label (as it appears in `targetDate`/`d
 
 ## Health Indicator (no data to author - fully derived by the template)
 
-Every Master-Feature and Feature card/row shows a small traffic-light **Health** badge (Executive Summary milestone cards, and both the Master-Feature row and each Feature card on the PI Delivery Schedule tab), derived purely from that item's own `status` + its own Planned PI (`targetDate`/`date`) resolved via `piCalendar`, recomputed live against the real current date on every render:
+Every Master-Feature and Feature card/row shows a small traffic-light **Health** badge (Executive Summary milestone cards, and both the Master-Feature row and each Feature card on the PI Delivery Schedule tab). It always takes the **worst** of up to three signals, recomputed live against the real current date on every render:
 
-- **At Risk** (red): the item is `Blocked`, OR its own Planned PI has already ended (per `piCalendar`) while it still isn't `Completed`.
-- **Warning** (amber): the item isn't `Completed`/`Blocked`, and its own Planned PI ends within 14 days (per `piCalendar`) - e.g. planned for `26-Q2` which ends very soon, but the item is still `Planned` or only `In Progress`.
-- **Good** (green): everything else, including any item whose Planned PI isn't in `piCalendar` (never guessed).
+1. **Deadline health** (Features and Master-Features): the item is `Blocked` -> At Risk; its own Planned PI (`targetDate`/`date`, resolved via `piCalendar`) has already ended while it isn't `Completed` -> At Risk; that PI ends within 14 days while still open -> Warning; otherwise Good. A `Completed` item is never deadline-flagged (a stale "Completed" is caught by signal 2 instead). Any Planned PI not in `piCalendar` is never guessed - defaults to Good.
+2. **Self mismatch health** (Master-Features only): does the Master-Feature's own `status` look stale next to its rolled-up `progress`? Marked `Completed` while `progress < 100` -> At Risk if `progress < 50`, else Warning (e.g. **marked Completed but only 40% of its features are actually done -> At Risk**, not Good). Marked `Planned` while one or more features already show progress -> At Risk if any are fully `Completed`, else Warning. These use the exact same thresholds as the "status/progress mismatch" Automated Insight, so the badge and the insight always agree.
+3. **Roll-up health** (Master-Features only): a Master-Feature's badge can never be healthier than its worst Feature - **if even one Feature underneath it is Warning or At Risk, the Master-Feature is too**.
 
 Nothing needs to be added to the JSON for this beyond `masterFeatures`/`features` and `piCalendar` already being populated accurately.
 

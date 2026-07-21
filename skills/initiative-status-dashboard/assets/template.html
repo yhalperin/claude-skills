@@ -545,16 +545,30 @@
 
         // --- Health Indicator ---
         // A lightweight, always-visible traffic-light badge per Master-Feature/Feature (distinct from the Automated
-        // Insights panel): "At Risk" (red) once the item's own Planned PI has already ended while it isn't Completed,
-        // or the item is Blocked; "Warning" (amber) once that PI is ending soon (within PI_DEADLINE_SOON_DAYS) while
-        // still open; "Good" (green) otherwise. Purely derived, recomputed fresh on every render.
+        // Insights panel), combining THREE signals and always taking the worst of them - "At Risk" (red), "Warning"
+        // (amber), or "Good" (green):
+        //   1. Deadline health: is the item's own Planned PI already over (still open) or ending soon, or is the item Blocked?
+        //   2. Self mismatch health (Master-Features only): does the MF's own Jira status look stale next to its
+        //      rolled-up progress - e.g. marked Completed while only 40% of its features are actually done, or still
+        //      marked Planned while features have already started/finished?
+        //   3. Roll-up health (Master-Features only): a Master-Feature can never look healthier than its worst Feature -
+        //      if even one Feature underneath it is Warning/At Risk, the Master-Feature is too.
+        // Purely derived, recomputed fresh on every render.
         const HEALTH_STYLES = {
             "at-risk": { label: "At Risk", badge: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900", dot: "bg-rose-500" },
             "warning": { label: "Warning", badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
             "good": { label: "Good", badge: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" }
         };
+        const HEALTH_RANK = { good: 0, warning: 1, "at-risk": 2 };
 
-        function computeHealth(piLabel, status, today) {
+        // Combine two health levels, always keeping the worse (higher-ranked) one
+        function worseHealth(a, b) {
+            return HEALTH_RANK[b] > HEALTH_RANK[a] ? b : a;
+        }
+
+        // Signal 1: is this item's own Planned PI already over (while still open) or ending soon, or is it Blocked?
+        // Completed items are never deadline-flagged here - a stale "Completed" is caught by the mismatch check instead.
+        function computeDeadlineHealth(piLabel, status, today) {
             if (status === "Completed") return "good";
             if (status === "Blocked") return "at-risk";
 
@@ -567,6 +581,37 @@
             if (daysLeft < 0) return "at-risk"; // Planned PI already ended and item still open - late
             if (daysLeft <= PI_DEADLINE_SOON_DAYS) return "warning"; // PI ending soon and item hasn't finished yet
             return "good";
+        }
+
+        // Feature health = just its own deadline signal (a leaf Feature's `progress` always derives 1:1 from its own
+        // `status` per the data schema, so there's no separate self-mismatch signal to check at this level).
+        function computeFeatureHealth(feature, today) {
+            return computeDeadlineHealth(feature.date, feature.status, today);
+        }
+
+        // Master-Feature health = worst of: its own deadline signal, its own status/progress self-mismatch, and the
+        // worst Health of any Feature underneath it (a Master-Feature can never look healthier than its features).
+        function computeMasterFeatureHealth(mf, today) {
+            let health = computeDeadlineHealth(mf.targetDate, mf.status, today);
+
+            // Self mismatch: same thresholds as the "status/progress mismatch" Automated Insight, so the badge and the
+            // insight always agree - e.g. marked Completed but only 40% actually done is "At Risk", not "Good".
+            const completedCount = mf.features.filter(f => f.status === "Completed").length;
+            const startedCount = mf.features.filter(f => f.progress > 0).length;
+
+            if (mf.status === "Completed" && mf.progress < 100) {
+                health = worseHealth(health, mf.progress < 50 ? "at-risk" : "warning");
+            }
+            if (mf.status === "Planned" && startedCount > 0) {
+                health = worseHealth(health, completedCount > 0 ? "at-risk" : "warning");
+            }
+
+            // Roll-up
+            mf.features.forEach(f => {
+                health = worseHealth(health, computeFeatureHealth(f, today));
+            });
+
+            return health;
         }
 
         function healthBadgeHtml(level, extraClass) {
@@ -757,7 +802,7 @@
             const circumference = 2 * Math.PI * ringRadius;
 
             elMilestonesContainer.innerHTML = masterFeatures.map(mf => {
-                const health = computeHealth(mf.targetDate, mf.status, today);
+                const health = computeMasterFeatureHealth(mf, today);
                 const clampedProgress = Math.min(Math.max(mf.progress, 0), 100);
                 const offset = circumference * (1 - clampedProgress / 100);
 
@@ -1024,7 +1069,7 @@
                 statusBadgeStyle = "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900";
             }
 
-            const health = computeHealth(feat.date, feat.status, new Date());
+            const health = computeFeatureHealth(feat, new Date());
 
             return `
                 <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all">
@@ -1164,7 +1209,7 @@
                 const highlightStyle = isFiltered
                     ? "bg-brand-50/40 dark:bg-brand-950/10 border-l-4 border-l-brand-500"
                     : "";
-                const mfHealth = computeHealth(mf.targetDate, mf.status, today);
+                const mfHealth = computeMasterFeatureHealth(mf, today);
 
                 tr.innerHTML = `
                     <td class="py-4 px-4 font-semibold text-slate-800 dark:text-slate-100 text-xs align-middle leading-snug max-w-[280px] cursor-pointer group ${highlightStyle}" onclick="toggleRowFilter('${mf.name}')">
