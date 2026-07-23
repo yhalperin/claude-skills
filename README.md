@@ -15,20 +15,30 @@ A **skill** is a Markdown file (`SKILL.md`) that you drop into Claude Code's ski
 
 | Skill | Description |
 |-------|-------------|
-| [pi-planning](skills/pi-planning/) | PI Planning facilitator for program managers and POs. Covers theme readiness assessment, sprint-based epic planning, grooming meeting agendas, and all four PI lifecycle phases — grounded in the PSDLC process. |
-| [initiative-status-dashboard](skills/initiative-status-dashboard/) | Traverses one or more Jira Initiatives (Initiative → Master Feature → leaf Feature) and renders them as a self-contained HTML dashboard with KPI cards, a Master-Feature milestone table, a Jira-Group allocation swimlane matrix, and a manually-editable Risks panel. |
-| [pi-readiness-dashboard](skills/pi-readiness-dashboard/) | Builds a self-contained "PI Readiness Command Center" HTML dashboard from live Jira Theme issues for a chosen Program Increment, with KPI cards, a status/division bar chart, a portfolio composition donut, a themes registry table, and an in-browser Division → Group drill-down filter. |
-| [release-scope-dashboard](skills/release-scope-dashboard/) | Extracts a release's scope and current status from Jira and renders it as a self-contained HTML dashboard with a completion gauge, per-type status donuts, Themes/Epics grouped into headline sections, and a filterable bug list. |
+| [pi-planning](.cursor/skills/pi-planning/) | PI Planning facilitator for program managers and POs. Covers theme readiness assessment, sprint-based epic planning, grooming meeting agendas, and all four PI lifecycle phases — grounded in the PSDLC process. |
+| [initiative-status-dashboard](.cursor/skills/initiative-status-dashboard/) | Traverses one or more Jira Initiatives (Initiative → Master Feature → leaf Feature) and renders them as a self-contained HTML dashboard with KPI cards, a Master-Feature milestone card grid with per-item Health badges, a Master-Feature × Planned-PI delivery schedule table with a multi-select Group filter, and an Automated Insights panel. |
+| [pi-readiness-dashboard](.cursor/skills/pi-readiness-dashboard/) | Builds a self-contained "PI Readiness Command Center" HTML dashboard from live Jira Theme issues for a chosen Program Increment, with KPI cards, a status/division bar chart, a portfolio composition donut, a themes registry table, and an in-browser Division → Group drill-down filter. |
+| [release-scope-dashboard](.cursor/skills/release-scope-dashboard/) | Extracts a release's scope and current status from Jira and renders it as a self-contained HTML dashboard with a completion gauge, per-type status donuts, Themes/Epics grouped into headline sections, and a filterable bug list. |
+
+## Repo layout
+
+Skills live directly under [`.cursor/skills/`](.cursor/skills/) at the repo root — the same path Cursor auto-discovers for **project-level** skills. That means:
+
+- **Cloning/checking out this repo directly** (e.g. as the target repo for a Cursor Cloud Agent, or opening it as a Cursor project) makes every skill in this table available automatically — no copying required.
+- **Claude Code**, or a **Cursor personal (user-level)** setup, don't read `.cursor/skills/` from an arbitrary repo — see "How to Install a Skill" below for those cases.
 
 ## How to Install a Skill
 
-1. Copy the skill folder (e.g. `skills/pi-planning/`) into your agent's skills directory:
+1. Copy the skill folder (e.g. `.cursor/skills/pi-planning/`) into your agent's skills directory:
    - **Claude Code — Windows:** `C:\Users\<you>\.claude\skills\`
    - **Claude Code — Mac/Linux:** `~/.claude/skills/`
-   - **Cursor — Windows:** `C:\Users\<you>\.cursor\skills\`
-   - **Cursor — Mac/Linux:** `~/.cursor/skills/`
+   - **Cursor personal (user-level), any repo — Windows:** `C:\Users\<you>\.cursor\skills\`
+   - **Cursor personal (user-level), any repo — Mac/Linux:** `~/.cursor/skills/`
+   - **Cursor project-level, this repo's own agents/Cloud Agents:** already in place at `.cursor/skills/` — nothing to copy.
 2. Invoke the skill with `/pi-planning` (or whatever the skill name is), or let the agent trigger it automatically based on its description.
 3. The agent will load the skill and act as a specialized assistant for that domain.
+
+> **Note:** Cursor Cloud Agents only ever see project-level skills (`.cursor/skills/` inside the repo they're operating on) — they have no access to a user's local `~/.cursor/skills/`. If you want a skill to be usable from a Slack-triggered or Automation-triggered Cloud Agent, the target repo needs its own `.cursor/skills/<skill-name>/` (either this repo directly, or copied into the project repo you're actually working in).
 
 ## Contributing
 
