@@ -7,10 +7,11 @@ description: >-
   self-contained HTML dashboard (KPI cards, a Master-Feature milestone card
   grid, dynamic Jira-Group workload distribution, a Master-Feature x
   Planned-PI delivery schedule table with a multi-select Group filter, a
-  per-item traffic-light Health indicator, and an Automated Insights panel
-  flagging status/progress mismatches, Planned-PI deadline risks, and
-  Initiative timeline slippage with a detailed drill-down Insights tab)
-  that opens directly in a browser. Supports a combined dashboard for
+  per-item traffic-light Health indicator, clickable Jira deep links on every
+  issue key, and an Automated Insights panel flagging status/progress
+  mismatches, Planned-PI deadline risks, and Initiative timeline slippage
+  with a detailed drill-down Insights tab) that opens directly in a browser.
+  Supports a combined dashboard for
   several initiatives at once via a header dropdown. Re-runnable at any
   point to refresh with current Jira state. Use when the user asks to
   generate an initiative status dashboard/board, summarize one or more
@@ -21,11 +22,11 @@ disable-model-invocation: true
 
 # Initiative Status Dashboard
 
-Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone card grid with per-item, click-to-explain Health badges (clicking a card jumps to that Master-Feature's row on the PI Delivery Schedule tab), a Master-Feature x Planned-PI delivery schedule table with a multi-select Group filter, and an Automated Insights panel (with a full drill-down "Insights" tab). The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
+Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone card grid with per-item, click-to-explain Health badges (clicking a card jumps to that Master-Feature's row on the PI Delivery Schedule tab), a Master-Feature x Planned-PI delivery schedule table with a multi-select Group filter, clickable Jira deep links on every issue key shown anywhere on the board, and an Automated Insights panel (with a full drill-down "Insights" tab). The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
 
 ## Workflow
 
-1. **Confirm scope.** Get the Initiative issue key(s) to traverse (e.g. `JAG-36913`, or several at once). If the user gave them, use them. Ask only if genuinely ambiguous.
+1. **Confirm scope.** Get the Initiative issue key(s) to traverse (e.g. `JAG-36913`, or several at once). If the user gave them, use them. Ask only if genuinely ambiguous. Also determine the Jira **browse base URL** (`jiraBaseUrl` in the schema, e.g. `"https://your-jira-host/browse/"`) so issue keys can be deep-linked - infer it from context if the user has already shared a Jira issue link (this session or a prior one for the same Jira instance) or from an existing dashboard's data file for this instance; otherwise ask once. Without it, names simply render as plain text (no broken behavior either way).
 
 2. **Fetch data from Jira.** Use the `user-policy-broker` MCP tools (`jira_get_issue`, `jira_search`, `jira_search_fields`) per broker usage rules - never bypass the broker. For each Initiative:
    - Fetch the Initiative issue itself, including its **Planned PI** custom field (fields `summary,status,customfield_<planned_pi_id>` - confirm the id once per instance via `jira_search_fields` with keyword `"Planned PI"`, e.g. `customfield_14422`, exact name `"PlannedPI"`, a multiselect option field returned as `{ "value": ["27-Q1", "26-Q2"] }`) and its **Delivery Target** custom field (confirm the id via `jira_search_fields` with keyword `"Delivery Target"`, e.g. `customfield_22933`; returned as `{ "value": "YY-MM" }`, e.g. `"26-07"` (July 2026) or `"26-12"` (December 2026) -> `timelineRange`).
@@ -49,7 +50,7 @@ To pick the latest value when an issue has multiple: convert each to an ordinal 
 
 4. **Build the Planned PI calendar** (`piCalendar` in the schema) - this powers both the Automated Insights panel's "Planned PI ending soon / already ended" checks AND every item's traffic-light **Health** badge. Look for a fiscal-quarter timeline file already in the workspace (e.g. the sibling `pi-readiness-dashboard` skill's `assets/pi_timeline.json`) and flatten its `programIncrement` entries (`name`, `start`, `end`) across all `fiscalYears` into `piCalendar[name] = {start, end}`. If a Planned PI value shows up in your fetched Jira data but you have no source for its exact dates (e.g. a legacy label from before a fiscal-calendar change, or simply not in the timeline file), either ask the user for its end date or omit it from `piCalendar` - never fabricate a date; the dashboard just skips deadline/health checks for PIs it can't resolve (and defaults their Health to "Good" rather than guessing).
 
-5. **Assemble the JSON** matching [DATA_SCHEMA.md](DATA_SCHEMA.md) exactly - one key per initiative under `initiatives`, plus the top-level `piCalendar`, all in a single file even when given several initiative IDs (the template's dropdown switches between them at runtime). Write it to a temp file, e.g. `initiative_data.json`. No extra work is needed for the "PI Delivery Schedule" tab (including its Group filter), the Health badges, or the "Automated Insights" panel/"Insights" tab beyond this - the template derives everything else (schedule columns/rows, Group filter options, per-item Health, mismatch detection grouped by finding, PI-deadline items grouped by Planned PI, deadline countdowns using the real current date) live from `masterFeatures`/`features`/`piCalendar`.
+5. **Assemble the JSON** matching [DATA_SCHEMA.md](DATA_SCHEMA.md) exactly - one key per initiative under `initiatives`, plus the top-level `piCalendar` and `jiraBaseUrl` (if known), all in a single file even when given several initiative IDs (the template's dropdown switches between them at runtime). Write it to a temp file, e.g. `initiative_data.json`. No extra work is needed for the "PI Delivery Schedule" tab (including its Group filter), the Health badges, the Jira deep links, or the "Automated Insights" panel/"Insights" tab beyond this - the template derives everything else (schedule columns/rows, Group filter options, per-item Health, mismatch detection grouped by finding, PI-deadline items grouped by Planned PI, deadline countdowns using the real current date, and linking every embedded issue key found in a name/title) live from `masterFeatures`/`features`/`piCalendar`/`jiraBaseUrl`.
 
 6. **Render**:
    ```bash

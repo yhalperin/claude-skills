@@ -435,6 +435,10 @@
         // PIs not present here are skipped for those checks (never guessed), though status/progress mismatch checks
         // still run regardless.
         const PI_CALENDAR = PAYLOAD.piCalendar || {};
+        // Optional: base "browse" URL for this Jira instance (e.g. "https://your-jira-host/browse/"), shared across all
+        // initiatives. When present, every Master-Feature/Feature/Initiative name gets its embedded Jira issue key
+        // turned into a deep link via linkifyJiraKeys() below. When absent, names render as plain text - never guessed.
+        const JIRA_BASE_URL = PAYLOAD.jiraBaseUrl ? PAYLOAD.jiraBaseUrl.replace(/\/+$/, "") + "/" : null;
 
         // Active Application State tracking variables
         let currentInitiativeKey = Object.keys(INITIATIVE_DATA)[0];
@@ -501,6 +505,26 @@
 
         function slug(text) {
             return String(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        }
+
+        // --- Jira Deep Links ---
+        // Wraps a Jira issue key found in a name/title in a clickable link to JIRA_BASE_URL - only the key text itself
+        // becomes a link, any surrounding punctuation stays plain. Two shapes are recognized, matching how issue keys
+        // actually show up in this board's naming conventions:
+        //   1. Trailing "(KEY-123)" - every Master-Feature/Feature name, e.g. "Master-Feature: Foo (SHLD-28144)".
+        //   2. Leading "KEY-123: " - an Initiative title, e.g. "DPA-13462: [2026] Delegated administration...".
+        // No-ops (returns the text unchanged) when JIRA_BASE_URL isn't configured, or no key pattern is found.
+        const JIRA_KEY_SHAPE = /[A-Z][A-Z0-9]*-\d+/;
+
+        function jiraLinkHtml(key) {
+            return `<a href="${JIRA_BASE_URL}${key}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-brand-600 dark:text-brand-400 underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 hover:decoration-brand-500 underline-offset-2">${key}</a>`;
+        }
+
+        function linkifyJiraKeys(text) {
+            if (!JIRA_BASE_URL || !text) return text || "";
+            return String(text)
+                .replace(new RegExp(`\\((${JIRA_KEY_SHAPE.source})\\)`, "g"), (match, key) => `(${jiraLinkHtml(key)})`)
+                .replace(new RegExp(`^(${JIRA_KEY_SHAPE.source}):`), (match, key) => `${jiraLinkHtml(key)}:`);
         }
 
         // Resolve a Planned PI label (e.g. "27-Q1") to its known {start, end} ISO dates from PI_CALENDAR, if present.
@@ -678,7 +702,7 @@
                 <div class="space-y-2">
                     ${reasons.map(r => {
                         const style = HEALTH_STYLES[r.level] || HEALTH_STYLES.warning;
-                        return `<div class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full ${style.dot} mt-1 flex-shrink-0"></span><span class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">${r.text}</span></div>`;
+                        return `<div class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full ${style.dot} mt-1 flex-shrink-0"></span><span class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">${linkifyJiraKeys(r.text)}</span></div>`;
                     }).join("")}
                 </div>
             `;
@@ -905,7 +929,7 @@
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Master-Feature</span>
                             ${healthBadgeHtml(health)}
                         </div>
-                        <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug mb-4 line-clamp-2 min-h-[2.5rem]">${mf.name}</h4>
+                        <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug mb-4 line-clamp-2 min-h-[2.5rem]">${linkifyJiraKeys(mf.name)}</h4>
                         <div class="flex items-center gap-3.5">
                             <div class="relative w-14 h-14 flex-shrink-0">
                                 <svg class="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
@@ -1078,7 +1102,7 @@
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex items-center gap-1.5">
                                 <span class="w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0"></span>
-                                <h5 class="font-semibold text-slate-800 dark:text-slate-100 text-xs leading-snug">${g.title}</h5>
+                                <h5 class="font-semibold text-slate-800 dark:text-slate-100 text-xs leading-snug">${linkifyJiraKeys(g.title)}</h5>
                             </div>
                             <span class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${style.badge} flex-shrink-0">${style.label}</span>
                         </div>
@@ -1099,7 +1123,7 @@
                 const style = INSIGHT_SEVERITY_STYLES[g.severity] || INSIGHT_SEVERITY_STYLES.warning;
                 const rows = g.items.map(item => `
                     <tr class="border-b border-slate-100 dark:border-slate-800/60 last:border-b-0">
-                        <td class="py-2.5 px-3 text-xs font-medium text-slate-700 dark:text-slate-200">${item.name}</td>
+                        <td class="py-2.5 px-3 text-xs font-medium text-slate-700 dark:text-slate-200">${linkifyJiraKeys(item.name)}</td>
                         <td class="py-2.5 px-3 text-center"><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">${item.kind}</span></td>
                         <td class="py-2.5 px-3 text-center text-xs text-slate-600 dark:text-slate-300">${item.status}</td>
                         <td class="py-2.5 px-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400">${typeof item.progress === "number" ? item.progress + "%" : "\u2014"}</td>
@@ -1112,7 +1136,7 @@
                         <div class="p-4 flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
                             <div class="flex items-center gap-2">
                                 <span class="w-2 h-2 rounded-full ${style.dot} flex-shrink-0"></span>
-                                <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">${g.title}</h4>
+                                <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">${linkifyJiraKeys(g.title)}</h4>
                             </div>
                             <span class="text-[10px] font-semibold uppercase px-2 py-1 rounded ${style.badge} flex-shrink-0">${style.label}</span>
                         </div>
@@ -1178,7 +1202,7 @@
             return `
                 <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all">
                     <div class="flex items-start justify-between gap-1.5">
-                        <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${feat.name}</h5>
+                        <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${linkifyJiraKeys(feat.name)}</h5>
                         ${healthBadgeHtml(health)}
                     </div>
                     <div class="pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-1 mt-2">
@@ -1322,7 +1346,7 @@
                                 <span class="text-brand-600 dark:text-brand-400 font-bold text-[10px] tracking-wider uppercase block">Master-Feature</span>
                                 ${healthBadgeHtml(mfHealth)}
                             </div>
-                            <span class="hover:text-brand-500 font-bold leading-normal block transition-colors">${mf.name}</span>
+                            <span class="hover:text-brand-500 font-bold leading-normal block transition-colors">${linkifyJiraKeys(mf.name)}</span>
                             <div class="flex items-center gap-1.5 mt-2 font-mono text-[9px] text-slate-400 font-bold uppercase">
                                 <span class="bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200 dark:border-slate-800">Target ${mf.targetDate}</span>
                                 <span class="text-brand-500 font-bold hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Isolate row</span>
@@ -1346,7 +1370,7 @@
             if (activeMasterFeatureFilter) {
                 chips.push(`
                     <span class="px-2.5 py-1 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-brand-200 dark:border-brand-900">
-                        Isolating: <strong class="truncate max-w-[180px]">${activeMasterFeatureFilter.replace("Master-Feature: ", "")}</strong>
+                        Isolating: <strong class="truncate max-w-[180px]">${linkifyJiraKeys(activeMasterFeatureFilter.replace("Master-Feature: ", ""))}</strong>
                         <button onclick="clearScheduleRowFilter(); event.stopPropagation();" class="text-brand-500 hover:text-brand-700"><i data-lucide="x" class="w-3.5 h-3.5 inline"></i></button>
                     </span>
                 `);

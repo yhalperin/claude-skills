@@ -5,6 +5,7 @@ This is the JSON payload `scripts/render_dashboard.py` injects into the dashboar
 ```jsonc
 {
   "generatedAt": "2026-07-13T15:55:00+03:00",   // ISO timestamp, informational only
+  "jiraBaseUrl": "https://your-jira-host/browse/",  // optional, shared across all initiatives - see "Jira deep links" below
   "piCalendar": {                                // optional, shared across all initiatives - see "Planned PI calendar" below
     "26-Q2": { "end": "2026-08-01" },             // legacy PI (no known start) - the last one before the current fiscal system
     "27-Q1": { "start": "2026-08-02", "end": "2026-11-07" },
@@ -58,6 +59,17 @@ This is the JSON payload `scripts/render_dashboard.py` injects into the dashboar
 - **`targetDate` / `date` / `stats.timelineTarget` / `horizon`**: sourced from each issue's own **Planned PI** custom field (confirm id via `jira_search_fields` with keyword `"Planned PI"`), not `duedate`. Format is `"<fiscal-year>-Q<1-4>"`, e.g. `"27-Q1"`. This company's FY `YY` starts Aug 1 of calendar year `YY-1` (Q1 Aug-Oct, Q2 Nov-Jan, Q3 Feb-Apr, Q4 May-Jul). If an issue has multiple Planned PI values, take the latest by ordinal `year*4 + (quarter-1)` and use its raw label as-is - never convert it to a calendar date. Fall back to `"TBD"` if the field is empty. Each level (Initiative, Master Feature, Feature) reads its **own** Planned PI value directly off that issue - this is not a rollup/aggregation from child issues. This value also drives each item's **Health** badge (see below).
 - **`timelineRange`**: sourced from the Initiative issue's own Jira **"Delivery Target"** custom field (confirm id via `jira_search_fields` with keyword `"Delivery Target"`, e.g. `customfield_22933`). The field comes back as `{ "value": "YY-MM" }`, e.g. `"26-07"` (July 2026) or `"26-12"` (December 2026) - use that string verbatim, do NOT convert it to a month name. Fall back to `"TBD"` if empty or in an unrecognized shape. See "Delivery Target field" below for how this powers the automatic Off Track check.
 - All fields default gracefully to "TBD" placeholders in the template - never omit a key, but "TBD" / `0` / `[]` are safe fallbacks throughout.
+
+## Jira deep links (`jiraBaseUrl`)
+
+Optional top-level string - the "browse" URL prefix for your Jira instance, e.g. `"https://your-jira-host/browse/"` (a trailing slash is added automatically if missing). When present, the template automatically turns the Jira issue key embedded in every Master-Feature/Feature/Initiative name into a clickable deep link to that issue - **only the key text itself is linked**, not the whole name, and any surrounding punctuation (parentheses, the colon after an Initiative's key prefix) stays plain text. This covers every place a name/title is shown: Executive Summary milestone cards, PI Delivery Schedule rows and Feature cards, the Automated Insights cards/tables, and Health-badge reason popovers.
+
+Two shapes are recognized automatically - no extra JSON needed beyond names already following the conventions in this schema:
+
+- **Trailing `(KEY-123)`** - every Master-Feature/Feature `name` already ends this way (e.g. `"Master-Feature: Foo (SHLD-28144)"` -> only `SHLD-28144` becomes a link).
+- **Leading `KEY-123:`** - an Initiative's `title` (e.g. `"DPA-13462: [2026] Delegated administration..."` -> only `DPA-13462` becomes a link).
+
+If `jiraBaseUrl` is omitted, names simply render as plain text exactly as before - never guess a Jira host.
 
 ## Planned PI calendar (`piCalendar`)
 

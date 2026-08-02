@@ -1,5 +1,6 @@
 {
   "generatedAt": "2026-07-19T15:12:00+03:00",
+  "jiraBaseUrl": "https://ca-il-jira.il.cyber-ark.com:8443/browse/",
   "piCalendar": {
     "26-Q2": { "end": "2026-08-01" },
     "27-Q1": { "start": "2026-08-02", "end": "2026-11-07" },
