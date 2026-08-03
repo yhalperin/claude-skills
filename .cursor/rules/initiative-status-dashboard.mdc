@@ -1,0 +1,25 @@
+---
+description: Governs autonomous, non-interactive execution of the initiative-status-dashboard skill when there is nobody available to answer a follow-up question - Cloud Agents triggered from Slack, Automations, or the API. Always applied in this repo so it's in effect regardless of how or why the skill gets invoked.
+alwaysApply: true
+---
+
+# Autonomous execution: initiative-status-dashboard
+
+The `initiative-status-dashboard` skill (`.cursor/skills/initiative-status-dashboard/SKILL.md`) is designed to run two ways against this repo:
+
+1. **Interactively** - a human is chatting with the agent turn-by-turn in the IDE or CLI, and can answer a clarifying question.
+2. **Autonomously** - a Cloud Agent triggered by a Slack `@Cursor` mention, a Cursor Automation, or the API, where the entire task arrives as a single one-shot prompt (typically just one or more Jira Initiative issue keys) and there is no next turn to get a follow-up answer in.
+
+This rule only changes behavior for case 2. It never overrides the skill's own `SKILL.md` workflow, and it never tells the agent to skip a step, fabricate data, or bypass the `user-policy-broker` MCP tools - it only removes the option to stall on a question nobody can answer.
+
+## How to tell which case you're in
+
+Case 2 (autonomous) applies when your task came in as a single message with no realistic way to get a reply to a follow-up question - e.g. a Cloud Agent session started from a Slack mention, an Automation trigger, or an API call. If you are in a normal back-and-forth IDE/CLI chat with someone actively responding, you are in case 1 - behave exactly as `SKILL.md` already describes and ask clarifying questions whenever something is genuinely ambiguous.
+
+## Rules for the autonomous case
+
+- **An Initiative issue key given as the whole prompt is already-confirmed scope.** If the triggering message names one or more Initiative keys (e.g. `"DPA-13462"`, or a Slack message like `"@Cursor generate the initiative status dashboard for DPA-13462"`), treat that exactly as `SKILL.md` step 1's "if the user gave them, use them" - proceed directly into fetch -> map -> render. Do not stop to ask "should I proceed?", "can you confirm the key?", or similar - there is nobody to answer.
+- **Resolve everything else via the skill's own documented fallbacks, never a question.** Missing dates, groups, `jiraBaseUrl`, or PI-calendar entries all already have a documented placeholder or omission rule in `SKILL.md`/`DATA_SCHEMA.md` (`"TBD"`, `"Platform Core"`, omitting an unresolvable Planned PI from `piCalendar`, defaulting `statusColor`, etc.) - use those instead of pausing. Never invent a value that isn't one of those documented fallbacks.
+- **Always render with `--no-open`.** There is no browser on a Cloud Agent VM to open a result in. Report the written file path in your final message instead of relying on the auto-open.
+- **If a Jira MCP tool call gets blocked by Cursor's own tool-approval review and nobody is available to approve it:** retry it once the normal way (this alone resolves most cases). If it's still blocked after that retry, do not fail the whole run or go silent - finish rendering the dashboard with whatever data you did successfully resolve, and state plainly in your final report exactly what could not be fetched and why.
+- **Report results, don't ask for permission to report them.** End with the same traversal summary `SKILL.md` step 7 already asks for (Initiative title, # Master Features/Features resolved, fallbacks used, Health badge counts, Automated Insights highlights) - that's the deliverable for an unattended run, since there's no interactive follow-up to rely on afterward.

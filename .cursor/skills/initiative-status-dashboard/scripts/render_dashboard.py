@@ -9,6 +9,12 @@ Unlike a timestamped-output pattern, this defaults to a STABLE output filename
 (derived from the initiative keys, no timestamp) so that regenerating the same
 dashboard reuses the same path/bookmark across status updates.
 
+Fully non-interactive: no prompts, argparse-only flags, always exits 0 on success
+or a non-zero code with a message on stderr on failure. Safe to call from a
+non-interactive/headless context (e.g. a Cloud Agent) - always pass --no-open
+there, since there is no browser to open a result in; --out is also otherwise
+optional and safe to omit, since the default filename is fully deterministic.
+
 Usage:
     python render_dashboard.py --data initiative_data.json [--out output.html] [--no-open]
 """
@@ -78,7 +84,12 @@ def main() -> int:
     print(f"Initiatives included: {', '.join(initiatives.keys())}")
 
     if not args.no_open:
-        webbrowser.open(out_path.resolve().as_uri())
+        # Best-effort only - never let a headless/browserless environment (e.g. a Cloud Agent VM)
+        # turn a successful render into a failed run just because there's nowhere to open it.
+        try:
+            webbrowser.open(out_path.resolve().as_uri())
+        except webbrowser.Error as exc:
+            print(f"Note: could not open a browser ({exc}); dashboard was still written successfully.", file=sys.stderr)
 
     return 0
 

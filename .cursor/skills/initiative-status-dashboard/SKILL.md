@@ -26,7 +26,7 @@ Produces one self-contained HTML file - no server, no build step - visualizing o
 
 ## Workflow
 
-1. **Confirm scope.** Get the Initiative issue key(s) to traverse (e.g. `JAG-36913`, or several at once). If the user gave them, use them. Ask only if genuinely ambiguous. Also determine the Jira **browse base URL** (`jiraBaseUrl` in the schema, e.g. `"https://your-jira-host/browse/"`) so issue keys can be deep-linked - infer it from context if the user has already shared a Jira issue link (this session or a prior one for the same Jira instance) or from an existing dashboard's data file for this instance; otherwise ask once. Without it, names simply render as plain text (no broken behavior either way).
+1. **Confirm scope.** Get the Initiative issue key(s) to traverse (e.g. `JAG-36913`, or several at once). If the user gave them, use them - this includes an Initiative key arriving as the entire prompt from a Slack `@Cursor` mention or an Automation, which counts as fully confirmed scope just like a typed-out IDE request. Ask only if genuinely ambiguous **and there is an interactive user able to answer** - see "Running autonomously" below for the unattended case. Also determine the Jira **browse base URL** (`jiraBaseUrl` in the schema, e.g. `"https://your-jira-host/browse/"`) so issue keys can be deep-linked - infer it from context if the user has already shared a Jira issue link (this session or a prior one for the same Jira instance) or from an existing dashboard's data file for this instance; otherwise ask once, or omit it if there's nobody to ask. Without it, names simply render as plain text (no broken behavior either way).
 
 2. **Fetch data from Jira.** Use the `user-policy-broker` MCP tools (`jira_get_issue`, `jira_search`, `jira_search_fields`) per broker usage rules - never bypass the broker. For each Initiative:
    - Fetch the Initiative issue itself, including its **Planned PI** custom field (fields `summary,status,customfield_<planned_pi_id>` - confirm the id once per instance via `jira_search_fields` with keyword `"Planned PI"`, e.g. `customfield_14422`, exact name `"PlannedPI"`, a multiselect option field returned as `{ "value": ["27-Q1", "26-Q2"] }`) and its **Delivery Target** custom field (confirm the id via `jira_search_fields` with keyword `"Delivery Target"`, e.g. `customfield_22933`; returned as `{ "value": "YY-MM" }`, e.g. `"26-07"` (July 2026) or `"26-12"` (December 2026) -> `timelineRange`).
@@ -56,7 +56,7 @@ To pick the latest value when an issue has multiple: convert each to an ordinal 
    ```bash
    python scripts/render_dashboard.py --data initiative_data.json
    ```
-   This injects the JSON into `assets/template.html` and writes `dashboard_<keys>.html` next to the data file (a **stable** filename, not timestamped - see "Re-running" below), then opens it in the default browser. Pass `--out <path>` to control the filename, or `--no-open` to skip auto-opening.
+   This is the one fully-scripted, non-interactive step in this whole workflow - plain `argparse`, no prompts, a clean non-zero exit code with a message on stderr if `--data`/the template can't be read or the JSON has no `initiatives`. It injects the JSON into `assets/template.html` and writes `dashboard_<keys>.html` next to the data file (a **stable** filename, not timestamped - see "Re-running" below), then opens it in the default browser. Pass `--out <path>` to control the filename, or **`--no-open`** when there's no browser to open it in (always use this in a Cloud Agent/Slack/Automation run - see below).
 
 7. Report a traversal summary per initiative: Initiative title, # Master Features, # Features resolved, any fallbacks used (missing dates/groups), a quick count of items with a "Warning"/"At Risk" Health badge, and a note of what the Automated Insights panel surfaced (e.g. "flagged 2 status mismatches, 1 Planned-PI group with 6 items still open for 26-Q2 ending in 12 days, and an Off Track timeline slip (latest PI 27-Q2 vs Delivery Target 26-07) - full breakdown on the Insights tab").
 
@@ -64,8 +64,15 @@ To pick the latest value when an issue has multiple: convert each to an ordinal 
 
 Same initiative key(s), same workflow - just re-fetch and re-render. There's no local state to preserve between runs (the Health badges, Automated Insights, and filters are all derived live from the JSON + the real current date), so simply overwrite the previous output file.
 
+## Running autonomously (Slack, Cloud Agents, Automations)
+
+This entire workflow works unchanged from an interactive IDE/CLI Agent chat - nothing above requires the non-interactive path. The difference only matters when there's genuinely nobody available to answer a follow-up question, e.g. a Cloud Agent triggered by a Slack `@Cursor` mention or an Automation, where the whole task arrives as one message (typically just the Initiative issue key(s)) and there's no next turn to clarify anything in.
+
+The repo's [`.cursor/rules/initiative-status-dashboard.mdc`](../../rules/initiative-status-dashboard.mdc) is the enforced contract for that case - always-applied, so it's in effect for every agent working in this repo, not just when this skill happens to be invoked. In short: an Initiative key given as the whole prompt is already-confirmed scope (never stall on "should I proceed?"), any other missing/ambiguous field falls back to this file's documented placeholders (`"TBD"`, omitting an unresolvable Planned PI, etc.) instead of a question nobody can answer, step 6 always runs with `--no-open`, and a blocked Jira MCP call with nobody available to approve it gets reported plainly rather than silently dropped or left hanging.
+
 ## Additional resources
 
 - Exact JSON shape and field semantics: [DATA_SCHEMA.md](DATA_SCHEMA.md)
 - Dashboard markup/styling (edit only for structural bugs - preserve the design): [assets/template.html](assets/template.html)
 - Example data file for reference: [examples/jag-36913-data.json](examples/jag-36913-data.json)
+- Autonomous/non-interactive execution contract (Slack, Cloud Agents, Automations): [`.cursor/rules/initiative-status-dashboard.mdc`](../../rules/initiative-status-dashboard.mdc) at the repo root
