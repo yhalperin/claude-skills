@@ -284,8 +284,8 @@
                         </div>
                     </div>
 
-                    <!-- Milestone Card Grid -->
-                    <div id="milestones-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Milestone Swimlanes - one lane per Planned-PI target, chronologically sorted -->
+                    <div id="milestones-grid" class="space-y-6">
                         <!-- Populated dynamically -->
                     </div>
                 </div>
@@ -909,14 +909,30 @@
             return "bg-emerald-500";
         }
 
-        // Render Milestones (Master-Features) as a responsive card grid, each with a Health badge and a circular progress ring.
-        // Clicking a card (outside the Health badge) jumps to the PI Delivery Schedule tab, isolated to that Master-Feature.
+        // Distinct Master-Feature target PIs (targetDate) actually present in this initiative, sorted chronologically
+        // via piOrdinal - same convention as getSortedPlannedPIs, just one level up (Master-Feature instead of Feature).
+        // Unresolvable values (e.g. "TBD") are pushed to a trailing lane rather than guessed at.
+        function getSortedMasterFeatureTargetPIs(masterFeatures) {
+            const values = [];
+            masterFeatures.forEach(mf => {
+                if (!values.includes(mf.targetDate)) values.push(mf.targetDate);
+            });
+            const known = values.filter(v => piOrdinal(v) !== null).sort((a, b) => piOrdinal(a) - piOrdinal(b));
+            const unknown = values.filter(v => piOrdinal(v) === null);
+            return known.concat(unknown);
+        }
+
+        // Render Milestones (Master-Features) as swimlanes grouped by each Master-Feature's own Planned-PI target
+        // (targetDate), chronologically ordered left-to-right/top-to-bottom - i.e. "what's landing in each PI",
+        // mirroring the PI Delivery Schedule's own column ordering. Each card keeps its Health badge and circular
+        // progress ring; clicking a card (outside the Health badge) jumps to the PI Delivery Schedule tab, isolated
+        // to that Master-Feature.
         function renderMilestonesGrid(masterFeatures) {
             const today = new Date();
             const ringRadius = 24;
             const circumference = 2 * Math.PI * ringRadius;
 
-            elMilestonesContainer.innerHTML = masterFeatures.map(mf => {
+            function buildMilestoneCardHtml(mf) {
                 const health = computeMasterFeatureHealth(mf, today);
                 const clampedProgress = Math.min(Math.max(mf.progress, 0), 100);
                 const offset = circumference * (1 - clampedProgress / 100);
@@ -941,15 +957,37 @@
                             <div class="flex-1 space-y-1.5 min-w-0">
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold inline-block ${statusPillClasses(mf.status)}">${mf.status}</span>
                                 <div class="flex items-center gap-1 text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                                    <i data-lucide="calendar" class="w-3 h-3 flex-shrink-0"></i> Target ${mf.targetDate}
-                                </div>
-                                <div class="flex items-center gap-1 text-[10px] font-mono text-slate-400 dark:text-slate-500">
                                     <i data-lucide="layers" class="w-3 h-3 flex-shrink-0"></i> ${mf.features.length} Feature${mf.features.length === 1 ? '' : 's'}
                                 </div>
                             </div>
                         </div>
                         <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center gap-1 text-[10px] font-semibold text-brand-500 dark:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity">
                             <i data-lucide="calendar-range" class="w-3 h-3"></i> View in PI Delivery Schedule &rarr;
+                        </div>
+                    </div>
+                `;
+            }
+
+            const piLanes = getSortedMasterFeatureTargetPIs(masterFeatures);
+
+            elMilestonesContainer.innerHTML = piLanes.map(pi => {
+                const laneItems = masterFeatures.filter(mf => mf.targetDate === pi);
+                const isResolved = piOrdinal(pi) !== null;
+                const pillClass = isResolved
+                    ? "bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-400 border-brand-200 dark:border-brand-900"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700";
+
+                return `
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wide border ${pillClass} flex-shrink-0">
+                                <i data-lucide="calendar" class="w-3 h-3 inline -mt-0.5 mr-1"></i>${pi}
+                            </span>
+                            <span class="text-[11px] text-slate-400 dark:text-slate-500 font-mono flex-shrink-0">${laneItems.length} Master-Feature${laneItems.length === 1 ? '' : 's'}</span>
+                            <div class="flex-1 h-px bg-slate-100 dark:bg-slate-800"></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${laneItems.map(buildMilestoneCardHtml).join("")}
                         </div>
                     </div>
                 `;

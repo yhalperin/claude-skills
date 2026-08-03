@@ -22,7 +22,7 @@ disable-model-invocation: true
 
 # Initiative Status Dashboard
 
-Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone card grid with per-item, click-to-explain Health badges (clicking a card jumps to that Master-Feature's row on the PI Delivery Schedule tab), a Master-Feature x Planned-PI delivery schedule table with a multi-select Group filter, clickable Jira deep links on every issue key shown anywhere on the board, and an Automated Insights panel (with a full drill-down "Insights" tab). The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
+Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone panel swimlaned by target Planned PI with per-item, click-to-explain Health badges (clicking a card jumps to that Master-Feature's row on the PI Delivery Schedule tab), a Master-Feature x Planned-PI delivery schedule table with a multi-select Group filter, clickable Jira deep links on every issue key shown anywhere on the board, and an Automated Insights panel (with a full drill-down "Insights" tab). The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
 
 ## Workflow
 
