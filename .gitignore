@@ -1,0 +1,9 @@
+# Scratch space used by external callers of the initiative-status-dashboard skill
+# (e.g. the initiative-status-slack-bot service) when this checkout is used as their
+# CLAUDE_SKILLS_REPO_PATH - never meant to be committed.
+tmp/
+
+# Common local junk
+__pycache__/
+*.pyc
+.DS_Store

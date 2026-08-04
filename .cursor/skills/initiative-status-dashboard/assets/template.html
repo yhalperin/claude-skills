@@ -100,6 +100,13 @@
                         <span class="w-2 h-2 rounded-full bg-emerald-500 relative flex pulse-dot"></span>
                         On Track
                     </span>
+
+                    <!-- Back to the multi-initiative Overview - only ever shown when 2+ initiatives are loaded and
+                         we're currently drilled into one of them; hidden entirely in single-initiative dashboards. -->
+                    <button id="back-to-overview-btn" onclick="showOverview()" class="hidden items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-300 transition-all duration-200">
+                        <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+                        <span class="hidden sm:inline">All Initiatives</span>
+                    </button>
                 </div>
 
                 <!-- Right Header Tools -->
@@ -147,8 +154,95 @@
                 </div>
             </div>
 
+            <!-- Multi-Initiative Overview - the landing view whenever 2+ initiatives are loaded into this dashboard.
+                 Summarizes every initiative's progress and Planned-Timeline-vs-Actual at a glance; clicking a card
+                 (or picking it from the header dropdown) drills into that initiative's normal detail view below.
+                 Never shown at all when only a single initiative is loaded - see MULTI_INITIATIVE in the script. -->
+            <div id="view-overview" class="hidden space-y-6">
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-brand-500/10 rounded-full blur-xl"></div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Initiatives Loaded</span>
+                                <h3 class="text-3xl font-bold mt-1 text-slate-900 dark:text-white" id="overview-initiative-count">0</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/50 flex items-center justify-center text-brand-600 dark:text-brand-400">
+                                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <p class="mt-5 text-xs text-slate-500 dark:text-slate-400">Click any card below, or use the dropdown above, to open its full dashboard.</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl"></div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Combined Progress</span>
+                                <h3 class="text-3xl font-bold mt-1 text-slate-900 dark:text-white" id="overview-overall-progress">0%</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                <i data-lucide="activity" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <div class="mt-5 space-y-2">
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="overview-overall-progress-bar" class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: 0%;"></div>
+                            </div>
+                            <span class="text-xs text-slate-500 dark:text-slate-400" id="overview-overall-progress-sub">0 / 0 Features Delivered</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-rose-500/10 rounded-full blur-xl"></div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Needs Attention</span>
+                                <h3 class="text-3xl font-bold mt-1 text-rose-600 dark:text-rose-400" id="overview-attention-count">0</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <p class="mt-5 text-xs text-slate-500 dark:text-slate-400">Blocked, Off Track, or with at least one At-Risk/Warning Health badge.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-5 pb-0">
+                        <h3 class="text-base font-semibold text-slate-900 dark:text-white">Initiatives</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Progress and Planned Timeline (Delivery Target) vs. Actual (latest Planned PI) for every loaded initiative. Click a row to open its dashboard.</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse text-left text-xs min-w-[820px]">
+                            <thead>
+                                <tr class="border-b border-slate-200 dark:border-slate-800">
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Initiative</th>
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Status</th>
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Progress</th>
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Planned Timeline</th>
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Actual (Latest PI)</th>
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Timeline Sync</th>
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400 text-right">Master Features</th>
+                                </tr>
+                            </thead>
+                            <tbody id="overview-grid" class="divide-y divide-slate-150 dark:divide-slate-800">
+                                <!-- Dynamic per-initiative summary rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Single-Initiative Detail - the pre-existing tabbed dashboard, unchanged. This is the only view in a
+                 single-initiative dashboard; in a multi-initiative one it's reached by drilling in from the Overview
+                 above via openInitiativeDetail(), and the "All Initiatives" header button returns to the Overview. -->
+            <div id="view-detail" class="space-y-6">
+
             <!-- Tabs and Filters Panel -->
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-2 border-b border-slate-200 dark:border-slate-800">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
                 <div class="flex gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl w-fit">
                     <button id="tab-snapshot-btn" onclick="switchTab('snapshot')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm">
                         <i data-lucide="layout" class="w-4 h-4"></i>
@@ -365,6 +459,9 @@
 
             </div>
 
+            </div>
+            <!-- /view-detail -->
+
         </main>
 
         <!-- Slide-Over/Modal: CSV Data Schema Studio -->
@@ -445,9 +542,17 @@
         let activeMasterFeatureFilter = null; // Isolates one Master-Feature row on the PI Delivery Schedule
         let activeGroupFilters = new Set(); // Multi-select Group filter on the PI Delivery Schedule; empty = show all groups
 
+        // Whether the multi-initiative Overview landing page exists at all for this dashboard - a single-initiative
+        // dashboard never shows it (goes straight to the detail view, exactly as before this feature existed).
+        const MULTI_INITIATIVE = Object.keys(INITIATIVE_DATA).length > 1;
+
         // Dom components pointers
         const elInitiativeSelector = document.getElementById("initiative-selector");
         const elGlobalStatusBadge = document.getElementById("global-status-badge");
+        const elBackToOverviewBtn = document.getElementById("back-to-overview-btn");
+        const elViewOverview = document.getElementById("view-overview");
+        const elViewDetail = document.getElementById("view-detail");
+        const elOverviewGrid = document.getElementById("overview-grid");
         const elStatProgressTxt = document.getElementById("stat-progress-txt");
         const elStatProgressBar = document.getElementById("stat-progress-bar");
         const elFeaturesRatioText = document.getElementById("features-ratio-text");
@@ -468,8 +573,135 @@
             lucide.createIcons();
             populateInitiativeSelector();
             elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
-            renderDashboard();
+            if (MULTI_INITIATIVE) {
+                renderOverview();
+                showOverview();
+            } else {
+                renderDashboard();
+            }
         };
+
+        // --- Multi-Initiative Overview ---
+        // Landing page shown instead of the detail view whenever 2+ initiatives are loaded (see MULTI_INITIATIVE).
+        // Never touched/shown in a single-initiative dashboard - view-overview simply stays "hidden" forever and
+        // window.onload above goes straight to renderDashboard(), exactly like before this feature existed.
+
+        // Switches back to the Overview grid from an initiative's detail view. No-op (and never reachable via the
+        // UI, since the button is hidden) when there's only one initiative - there's nothing to "go back" to.
+        function showOverview() {
+            if (!MULTI_INITIATIVE) return;
+            elViewOverview.classList.remove("hidden");
+            elViewDetail.classList.add("hidden");
+            elBackToOverviewBtn.classList.add("hidden");
+            elBackToOverviewBtn.classList.remove("inline-flex");
+            lucide.createIcons();
+        }
+
+        // Drills into one initiative's normal detail view - used by clicking an Overview card, picking the header
+        // dropdown, or (in a single-initiative dashboard) is simply never called since renderDashboard() runs directly.
+        function openInitiativeDetail(key) {
+            currentInitiativeKey = key;
+            activeMasterFeatureFilter = null; // Clear active row isolate on initiative hop
+            activeGroupFilters.clear(); // Clear active Group filter on initiative hop
+            elInitiativeSelector.value = key;
+            elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
+            if (MULTI_INITIATIVE) {
+                elViewOverview.classList.add("hidden");
+                elBackToOverviewBtn.classList.remove("hidden");
+                elBackToOverviewBtn.classList.add("inline-flex");
+            }
+            elViewDetail.classList.remove("hidden");
+            renderDashboard();
+        }
+
+        // Builds the Overview KPI row + one summary card per initiative, reusing the same health/off-track logic
+        // as the detail view (computeMasterFeatureHealth, detectTimelineOffTrack) so the two views can never disagree.
+        function renderOverview() {
+            if (!MULTI_INITIATIVE) return;
+            const today = new Date();
+            const keys = Object.keys(INITIATIVE_DATA);
+
+            let totalFeaturesAll = 0;
+            let completedFeaturesAll = 0;
+            let attentionCount = 0;
+
+            const rowsHtml = keys.map(key => {
+                const data = INITIATIVE_DATA[key];
+                const featuresStats = getFeaturesCompletionMetrics(data.masterFeatures);
+                const pct = featuresStats.total > 0 ? Math.round((featuresStats.completed / featuresStats.total) * 100) : 0;
+                totalFeaturesAll += featuresStats.total;
+                completedFeaturesAll += featuresStats.completed;
+
+                // Planned Timeline (Jira Delivery Target) vs. Actual (latest Planned PI), and the reconciled overall
+                // status - same computeEffectiveInitiativeStatus() the detail view's header badge uses, so an
+                // initiative can never show "On Track" here while its timeline is provably off track, and the
+                // red/orange severity always matches (more than a full Planned PI late = red, less = orange).
+                const effectiveStatus = computeEffectiveInitiativeStatus(data);
+                const offTrack = effectiveStatus.offTrack;
+                const variance = offTrack ? "Off Track" : data.stats.timelineVariance;
+                const varianceColor = offTrack ? offTrackSeverityColor(offTrack.daysLate) : (/risk|delay|stalling/i.test(variance) ? "rose" : "emerald");
+
+                // Worst rolled-up Health across every Master-Feature, exactly like each MF's own badge.
+                let worst = "good";
+                data.masterFeatures.forEach(mf => {
+                    worst = worseHealth(worst, computeMasterFeatureHealth(mf, today).level);
+                });
+
+                const needsAttention = effectiveStatus.statusColor !== "emerald" || worst !== "good";
+                if (needsAttention) attentionCount++;
+
+                const statusTone = effectiveStatus.statusColor === "rose"
+                    ? { dot: "bg-rose-500", text: "text-rose-700 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60" }
+                    : effectiveStatus.statusColor === "amber"
+                    ? { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60" }
+                    : { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60" };
+
+                const varianceClass = varianceColor === "rose" ? "text-rose-500 dark:text-rose-400" : varianceColor === "amber" ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+                const varianceIcon = varianceColor === "emerald" ? "check-circle-2" : "alert-triangle";
+
+                const mfCount = data.masterFeatures.length;
+
+                return `
+                    <tr onclick="openInitiativeDetail('${key}')" class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
+                        <td class="py-3.5 px-4 max-w-[320px]">
+                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">${linkifyJiraKeys(data.title)}</span>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${statusTone.bg} ${statusTone.text}">
+                                <span class="w-1.5 h-1.5 rounded-full ${statusTone.dot}"></span>${effectiveStatus.status}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 w-[220px]">
+                            <div class="flex items-center gap-2">
+                                <div class="w-24 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden flex-shrink-0">
+                                    <div class="bg-brand-500 h-1.5 rounded-full" style="width: ${pct}%;"></div>
+                                </div>
+                                <span class="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">${pct}% &middot; ${featuresStats.completed}/${featuresStats.total}</span>
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">${data.timelineRange}</td>
+                        <td class="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">${data.stats.timelineTarget}</td>
+                        <td class="py-3.5 px-4">
+                            <span class="inline-flex items-center gap-1 font-semibold whitespace-nowrap ${varianceClass}">
+                                <i data-lucide="${varianceIcon}" class="w-3 h-3"></i>${variance}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 text-right text-slate-400 whitespace-nowrap">${mfCount} MF${mfCount === 1 ? '' : 's'}</td>
+                    </tr>
+                `;
+            }).join("");
+
+            elOverviewGrid.innerHTML = rowsHtml;
+
+            const overallPct = totalFeaturesAll > 0 ? Math.round((completedFeaturesAll / totalFeaturesAll) * 100) : 0;
+            document.getElementById("overview-initiative-count").innerText = keys.length;
+            document.getElementById("overview-overall-progress").innerText = `${overallPct}%`;
+            document.getElementById("overview-overall-progress-bar").style.width = `${overallPct}%`;
+            document.getElementById("overview-overall-progress-sub").innerText = `${completedFeaturesAll} / ${totalFeaturesAll} Features Delivered`;
+            document.getElementById("overview-attention-count").innerText = attentionCount;
+
+            lucide.createIcons();
+        }
 
         // Build the initiative dropdown from whatever keys are present in INITIATIVE_DATA - supports 1..N initiatives
         function populateInitiativeSelector() {
@@ -565,6 +797,44 @@
             const piEnd = new Date(piEntry.end + "T00:00:00");
             if (piEnd <= deliveryTargetEnd) return null;
             return { piLabel, daysLate: daysBetween(deliveryTargetEnd, piEnd) };
+        }
+
+        // Average length of a "full" Planned PI (one with both a known start and end in PI_CALENDAR), used as the
+        // "more than a PI late" vs "less than a PI late" cutoff for Off Track severity below. Falls back to a
+        // standard ~13-week fiscal quarter if PI_CALENDAR has no fully-dated entries to measure from.
+        function estimatePiLengthDays() {
+            const durations = Object.values(PI_CALENDAR)
+                .filter(e => e && e.start && e.end)
+                .map(e => daysBetween(new Date(e.start + "T00:00:00"), new Date(e.end + "T00:00:00")));
+            if (!durations.length) return 91;
+            return durations.reduce((sum, d) => sum + d, 0) / durations.length;
+        }
+
+        // Off Track severity: more than a full Planned PI late is "rose" (red), anything less is "amber" (orange).
+        // Shared by the header status badge, the Overview rows, and the Status Sync KPI so they can never disagree.
+        function offTrackSeverityColor(daysLate) {
+            return daysLate > estimatePiLengthDays() ? "rose" : "amber";
+        }
+
+        const STATUS_COLOR_RANK = { emerald: 0, amber: 1, rose: 2 };
+
+        // Reconciles an Initiative's authored status/statusColor with its live Off Track check - an initiative can
+        // never claim "On Track" while its own latest Planned PI resolves later than its Jira Delivery Target
+        // (see detectTimelineOffTrack). Only ever escalates severity, never downgrades it: a genuinely Blocked
+        // initiative (authored rose) stays "Blocked" even if the timeline gap alone would only rate "amber".
+        // Returns { status, statusColor, offTrack } - offTrack is detectTimelineOffTrack()'s result (or null),
+        // returned here too so callers don't need to recompute it separately.
+        function computeEffectiveInitiativeStatus(data) {
+            const authoredColor = data.statusColor || "emerald";
+            const authoredStatus = data.status || "On Track";
+            const offTrack = detectTimelineOffTrack(data);
+            if (!offTrack) return { status: authoredStatus, statusColor: authoredColor, offTrack: null };
+
+            const offTrackColor = offTrackSeverityColor(offTrack.daysLate);
+            if (STATUS_COLOR_RANK[offTrackColor] > STATUS_COLOR_RANK[authoredColor]) {
+                return { status: "Off Track", statusColor: offTrackColor, offTrack };
+            }
+            return { status: authoredStatus, statusColor: authoredColor, offTrack };
         }
 
         // --- Health Indicator ---
@@ -741,8 +1011,10 @@
             document.getElementById("initiative-scope-badge").innerText = data.scope;
             document.getElementById("initiative-horizon-badge").innerText = data.horizon;
 
-            // Health statuses
-            updateGlobalStatus(data.status, data.statusColor);
+            // Health statuses - reconciled against the live Off Track check so the header badge can never say
+            // "On Track" while the timeline itself is provably off track (see computeEffectiveInitiativeStatus()).
+            const effectiveInitiativeStatus = computeEffectiveInitiativeStatus(data);
+            updateGlobalStatus(effectiveInitiativeStatus.status, effectiveInitiativeStatus.statusColor);
 
             // Calculate overall stats dynamically from Master-Feature metrics
             const featuresStats = getFeaturesCompletionMetrics(data.masterFeatures);
@@ -761,12 +1033,18 @@
             // Status Sync is normally the authored stats.timelineVariance, but gets auto-overridden to "Off Track"
             // whenever the Initiative's own latest Planned PI (stats.timelineTarget) resolves - via PI_CALENDAR - to a
             // later date than its Jira Delivery Target field (data.timelineRange, e.g. "26-12") - see detectTimelineOffTrack().
-            const timelineMismatch = detectTimelineOffTrack(data);
+            // Reuse the same offTrack result computeEffectiveInitiativeStatus() already resolved above, so the header
+            // badge and this KPI can never disagree about whether/how badly the timeline has slipped.
+            const timelineMismatch = effectiveInitiativeStatus.offTrack;
             const effectiveVariance = timelineMismatch ? "Off Track" : data.stats.timelineVariance;
             elStatTimelineVariance.innerText = effectiveVariance;
 
-            // Update color style of variance based on schedule status
-            if (effectiveVariance.includes("Risk") || effectiveVariance.includes("Delayed") || effectiveVariance.includes("Stalling") || effectiveVariance.includes("Off Track")) {
+            // Off Track severity (rose = more than a full Planned PI late, amber = less) takes priority; otherwise
+            // fall back to the authored free-text variance's own rose/emerald read.
+            if (timelineMismatch) {
+                const sev = offTrackSeverityColor(timelineMismatch.daysLate);
+                elStatTimelineVariance.className = sev === "rose" ? "font-semibold text-rose-500 dark:text-rose-400" : "font-semibold text-amber-500 dark:text-amber-400";
+            } else if (effectiveVariance.includes("Risk") || effectiveVariance.includes("Delayed") || effectiveVariance.includes("Stalling")) {
                 elStatTimelineVariance.className = "font-semibold text-rose-500 dark:text-rose-400";
             } else {
                 elStatTimelineVariance.className = "font-semibold text-emerald-600 dark:text-emerald-400";
@@ -1449,13 +1727,10 @@
             renderDashboard();
         }
 
-        // Switch Initiative dropdown selector state
+        // Switch Initiative dropdown selector state - also used to drill in from the Overview's dropdown while
+        // already on it, so it must behave identically to clicking an Overview card (openInitiativeDetail).
         function changeInitiative(key) {
-            currentInitiativeKey = key;
-            activeMasterFeatureFilter = null; // Clear active row isolate on initiative hop
-            activeGroupFilters.clear(); // Clear active Group filter on initiative hop
-            elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
-            renderDashboard();
+            openInitiativeDetail(key);
             toastAlert(`Switched Workspace context to ${INITIATIVE_DATA[key].title}`);
         }
 

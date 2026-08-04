@@ -87,6 +87,8 @@ Optional top-level map from a Planned PI label (as it appears in `targetDate`/`d
 - If the latest Planned PI ends **after** the Delivery Target month, the Initiative has slipped past what was committed - the "Status Sync" badge on the Planned Timeline KPI card is automatically forced to **"Off Track"** (overriding whatever you authored in `stats.timelineVariance`), and a matching Automated Insight is raised (see below).
 - If either date can't be resolved (`timelineRange` isn't a parseable `"YY-MM"` string, or `stats.timelineTarget`'s PI isn't in `piCalendar`), the check is silently skipped and your authored `stats.timelineVariance` stands as-is - never guess dates yourself to force this.
 - This means you should NOT try to hand-compute "Off Track" in `stats.timelineVariance` - just author your best-guess fallback there for cases the automatic check can't resolve, and populate `timelineRange` + `piCalendar` accurately; the template derives the verdict live.
+- **Severity color**: an Off Track verdict is also colored - **rose (red)** if the latest Planned PI ends more than one full Planned PI's length (~13 weeks, measured from whatever fully-dated `piCalendar` entries exist) after the Delivery Target, otherwise **amber (orange)** for a smaller slip. This is the same red/orange split used everywhere Off Track severity is shown (see below).
+- **This also reconciles the Initiative's overall `status`/`statusColor`** (the header pill, and the Overview's per-initiative Status column) - an Initiative can never display "On Track"/emerald while its own timeline is provably Off Track. Concretely: whichever is *worse* between your authored `statusColor` and the Off Track severity color above wins; when Off Track wins, the displayed status text becomes **"Off Track"** (not your authored `status`) in that color. A genuinely `"Blocked"`/rose Initiative stays "Blocked" even if its timeline gap alone would only be amber - this only ever escalates, never downgrades, your authored severity. You still author `status`/`statusColor` exactly as before (see the `statusColor` rule above); this reconciliation is purely a live template computation on top, so there is nothing extra to add to the JSON for it.
 
 ## Health Indicator (no data to author - fully derived by the template)
 
@@ -103,6 +105,20 @@ Nothing needs to be added to the JSON for this beyond `masterFeatures`/`features
 **Why this health? (click-to-explain).** Every badge that isn't Good is clickable - clicking it opens a small popover listing the exact reason(s) it isn't Good in plain English (e.g. *"Marked Completed, but its features are only 40% done on average (2/5 completed)."*, or, rolled up from a child, *"Feature 'X': Planned PI 26-Q2 ends in 5 days, and this is still In Progress."*). Good badges have no reasons and aren't clickable. This uses the exact same `computeMasterFeatureHealth`/`computeFeatureHealth` results as the badge color itself, so the popover text and the badge color can never disagree.
 
 **Click-through from Executive Summary to Schedule.** Clicking anywhere on a Master-Feature milestone card in the Executive Summary tab (outside the Health badge itself, which opens its own popover instead) jumps to the PI Delivery Schedule tab with that Master-Feature isolated via the same row filter used by clicking a row there directly.
+
+## Multi-Initiative Overview (no data to author - fully derived by the template)
+
+Whenever `initiatives` has 2+ entries, the dashboard opens on an **Overview** landing page instead of going straight to a single initiative's detail view (a single-entry `initiatives` object skips this entirely and behaves exactly as before - straight to the detail view, no Overview to be found anywhere in the UI or DOM).
+
+The Overview shows a combined KPI row (initiative count, combined feature-progress %, and a "Needs Attention" count) plus a one-row-per-initiative table with:
+
+- **Status**: the *reconciled* status/color from the "Delivery Target field" section above (`computeEffectiveInitiativeStatus()`) - never "On Track" while that initiative's timeline is Off Track, red/orange severity matching the gap size - so this column and the detail view's header badge can never disagree.
+- **Progress**: the same rolled-up features-completed percentage as that initiative's own "Initiative Progress" KPI.
+- **Planned Timeline** / **Actual (Latest PI)**: `timelineRange` (the Jira Delivery Target) and `stats.timelineTarget` (the latest Planned PI) side-by-side as their own columns.
+- **Timeline Sync**: the same On Schedule/Off Track verdict (and red/orange severity) as the detail view's "Status Sync" KPI - the two never disagree since it's the same `detectTimelineOffTrack()`/`offTrackSeverityColor()` computation.
+- A **Needs Attention** flag (feeds the KPI row's count) whenever the reconciled `statusColor` isn't `"emerald"`, or any of the initiative's Master-Features rolls up to a Warning/At-Risk Health badge.
+
+Clicking a card (or picking an initiative from the header dropdown while on the Overview) drills into that initiative's normal detail view; a new "All Initiatives" header button (only ever visible in a multi-initiative dashboard, and only once you've drilled into a detail view) returns to the Overview. Nothing needs to be added to the JSON for any of this beyond `initiatives`, `masterFeatures`/`features`, and `piCalendar` already being populated accurately per initiative.
 
 ## Group filter (PI Delivery Schedule tab)
 
