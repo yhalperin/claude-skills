@@ -840,20 +840,32 @@
         // --- Health Indicator ---
         // A lightweight, always-visible traffic-light badge per Master-Feature/Feature (distinct from the Automated
         // Insights panel), combining THREE signals and always taking the worst of them - "At Risk" (red), "Warning"
-        // (amber), or "Good" (green):
+        // (amber), or "Good" (green). A fourth pseudo-level "cancelled" is used for archived/cancelled items to
+        // visually distinguish them without polluting the health roll-up.
         //   1. Deadline health: is the item's own Planned PI already over (still open) or ending soon, or is the item Blocked?
         //   2. Self mismatch health (Master-Features only): does the MF's own Jira status look stale next to its
         //      rolled-up progress - e.g. marked Completed while only 40% of its features are actually done, or still
         //      marked Planned while features have already started/finished?
         //   3. Roll-up health (Master-Features only): a Master-Feature can never look healthier than its worst Feature -
         //      if even one Feature underneath it is Warning/At Risk, the Master-Feature is too.
+        //   Cancelled/Archived items are excluded from counts, health roll-up, and all Insight checks.
         // Purely derived, recomputed fresh on every render.
+
+        // Returns true for any Jira status meaning the issue has been archived or cancelled.
+        // These items are excluded from feature counts, health roll-up, and all deadline/mismatch Insights.
+        function isCancelled(status) {
+            const s = (status || "").toLowerCase();
+            return s === "archive" || s === "archived" || s === "cancelled" || s === "canceled";
+        }
+
         const HEALTH_STYLES = {
-            "at-risk": { label: "At Risk", badge: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900", dot: "bg-rose-500" },
-            "warning": { label: "Warning", badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
-            "good": { label: "Good", badge: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" }
+            "at-risk":   { label: "At Risk",   badge: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900", dot: "bg-rose-500" },
+            "warning":   { label: "Warning",   badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
+            "good":      { label: "Good",      badge: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" },
+            "cancelled": { label: "Cancelled", badge: "bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-500 ring-1 ring-slate-200 dark:ring-slate-700", dot: "bg-slate-300 dark:bg-slate-600" }
         };
-        const HEALTH_RANK = { good: 0, warning: 1, "at-risk": 2 };
+        // "cancelled" ranks same as "good" so it never contaminates a parent's health roll-up
+        const HEALTH_RANK = { good: 0, cancelled: 0, warning: 1, "at-risk": 2 };
 
         // Combine two health levels, always keeping the worse (higher-ranked) one
         function worseHealth(a, b) {
@@ -861,10 +873,12 @@
         }
 
         // Signal 1: is this item's own Planned PI already over (while still open) or ending soon, or is it Blocked?
-        // Completed items are never deadline-flagged here - a stale "Completed" is caught by the mismatch check instead.
+        // Completed and Cancelled items are never deadline-flagged - a stale "Completed" is caught by the mismatch
+        // check instead; Cancelled items are excluded from all health concerns entirely.
         // Returns { level, reason } - reason is a human-readable string, or null when level is "good".
         function computeDeadlineHealth(piLabel, status, today) {
             if (status === "Completed") return { level: "good", reason: null };
+            if (isCancelled(status)) return { level: "good", reason: null };
             if (status === "Blocked") return { level: "at-risk", reason: "Marked Blocked in Jira." };
 
             const entry = resolvePiCalendarEntry(piLabel);
@@ -885,40 +899,48 @@
 
         // Feature health = just its own deadline signal (a leaf Feature's `progress` always derives 1:1 from its own
         // `status` per the data schema, so there's no separate self-mismatch signal to check at this level).
+        // Cancelled/Archived features return level "cancelled" and never propagate into a parent's roll-up.
         // Returns { level, reasons: [{ level, text }, ...] }.
         function computeFeatureHealth(feature, today) {
+            if (isCancelled(feature.status)) return { level: "cancelled", reasons: [] };
             const deadline = computeDeadlineHealth(feature.date, feature.status, today);
             return { level: deadline.level, reasons: deadline.reason ? [{ level: deadline.level, text: deadline.reason }] : [] };
         }
 
         // Master-Feature health = worst of: its own deadline signal, its own status/progress self-mismatch, and the
-        // worst Health of any Feature underneath it (a Master-Feature can never look healthier than its features).
+        // worst Health of any *active* Feature underneath it (cancelled features are excluded from roll-up entirely).
+        // Cancelled MFs return level "cancelled" without any further analysis.
         // Returns { level, reasons: [{ level, text }, ...] } - reasons are only populated for non-"good" contributors.
         function computeMasterFeatureHealth(mf, today) {
+            if (isCancelled(mf.status)) return { level: "cancelled", reasons: [] };
+
             const reasons = [];
             const deadline = computeDeadlineHealth(mf.targetDate, mf.status, today);
             let health = deadline.level;
             if (deadline.reason) reasons.push({ level: deadline.level, text: deadline.reason });
 
+            // Only active (non-cancelled) features count for self-mismatch and roll-up checks
+            const activeFeatures = mf.features.filter(f => !isCancelled(f.status));
+            const totalFeatures = activeFeatures.length;
+            const completedCount = activeFeatures.filter(f => f.status === "Completed").length;
+            const startedCount = activeFeatures.filter(f => f.progress > 0).length;
+
             // Self mismatch: same thresholds as the "status/progress mismatch" Automated Insight, so the badge and the
             // insight always agree - e.g. marked Completed but only 40% actually done is "At Risk", not "Good".
-            const totalFeatures = mf.features.length;
-            const completedCount = mf.features.filter(f => f.status === "Completed").length;
-            const startedCount = mf.features.filter(f => f.progress > 0).length;
-
             if (mf.status === "Completed" && mf.progress < 100) {
                 const level = mf.progress < 50 ? "at-risk" : "warning";
                 health = worseHealth(health, level);
-                reasons.push({ level, text: `Marked Completed, but its features are only ${mf.progress}% done on average (${completedCount}/${totalFeatures} completed).` });
+                reasons.push({ level, text: `Marked Completed, but its features are only ${mf.progress}% done on average (${completedCount}/${totalFeatures} active completed).` });
             }
             if (mf.status === "Planned" && startedCount > 0) {
                 const level = completedCount > 0 ? "at-risk" : "warning";
                 health = worseHealth(health, level);
-                reasons.push({ level, text: `Still marked Planned, but ${startedCount}/${totalFeatures} of its features already show progress${completedCount > 0 ? ` (${completedCount} fully completed)` : ''}.` });
+                reasons.push({ level, text: `Still marked Planned, but ${startedCount}/${totalFeatures} of its active features already show progress${completedCount > 0 ? ` (${completedCount} fully completed)` : ''}.` });
             }
 
-            // Roll-up: pull in every non-"good" Feature's own reason too, so it's clear which Feature(s) are dragging the Master-Feature down
-            mf.features.forEach(f => {
+            // Roll-up: pull in every non-cancelled Feature's health reason, so it's clear which Feature(s) drag the MF down.
+            // Cancelled features are silently skipped - they don't contribute to parent health at all.
+            activeFeatures.forEach(f => {
                 const fHealth = computeFeatureHealth(f, today);
                 health = worseHealth(health, fHealth.level);
                 fHealth.reasons.forEach(r => reasons.push({ level: r.level, text: `Feature "${f.name}": ${r.text}` }));
@@ -1062,12 +1084,15 @@
             lucide.createIcons();
         }
 
-        // Calculate direct features aggregates from loaded milestones structure
+        // Calculate direct features aggregates from loaded milestones structure.
+        // Cancelled/Archived MFs and features are excluded from both counts - they don't represent work in flight.
         function getFeaturesCompletionMetrics(masterFeatures) {
             let total = 0;
             let completed = 0;
             masterFeatures.forEach(mf => {
+                if (isCancelled(mf.status)) return;
                 mf.features.forEach(f => {
+                    if (isCancelled(f.status)) return;
                     total++;
                     if (f.status === "Completed") completed++;
                 });
@@ -1111,10 +1136,13 @@
         ];
 
         // Distinct set of Theme-level "Group" allocations actually present in this initiative, in first-seen order
+        // Returns the distinct Group values present across all active (non-cancelled) features.
         function getDistinctGroups(masterFeatures) {
             const groups = [];
             masterFeatures.forEach(mf => {
+                if (isCancelled(mf.status)) return;
                 mf.features.forEach(f => {
+                    if (isCancelled(f.status)) return;
                     if (!groups.includes(f.group)) groups.push(f.group);
                 });
             });
@@ -1125,14 +1153,17 @@
             return GROUP_COLOR_PALETTE[groupList.indexOf(groupName) % GROUP_COLOR_PALETTE.length];
         }
 
-        // Calculate workload density per execution group (derived live from each Theme's "Group" field) and render horizontal stacked bar
+        // Calculate workload density per execution group (derived live from each active Theme's "Group" field) and render horizontal stacked bar.
+        // Cancelled/Archived features are excluded from the distribution so they don't skew group workload.
         function renderGroupWorkloadDistribution(masterFeatures) {
             const groupNames = getDistinctGroups(masterFeatures);
             const counts = {};
             let total = 0;
 
             masterFeatures.forEach(mf => {
+                if (isCancelled(mf.status)) return;
                 mf.features.forEach(f => {
+                    if (isCancelled(f.status)) return;
                     counts[f.group] = (counts[f.group] || 0) + 1;
                     total++;
                 });
@@ -1184,6 +1215,7 @@
         function healthAccentClass(level) {
             if (level === "at-risk") return "bg-rose-500";
             if (level === "warning") return "bg-amber-500";
+            if (level === "cancelled") return "bg-slate-200 dark:bg-slate-700";
             return "bg-emerald-500";
         }
 
@@ -1215,9 +1247,13 @@
                 const clampedProgress = Math.min(Math.max(mf.progress, 0), 100);
                 const offset = circumference * (1 - clampedProgress / 100);
                 const mfNameEscaped = mf.name.replace(/'/g, "\\'");
+                const activeFeatureCount = mf.features.filter(f => !isCancelled(f.status)).length;
+                const cancelledFeatureCount = mf.features.length - activeFeatureCount;
+                const featureCountLabel = `${activeFeatureCount} Feature${activeFeatureCount === 1 ? '' : 's'}${cancelledFeatureCount > 0 ? ` <span class="text-slate-300 dark:text-slate-600">(${cancelledFeatureCount} archived)</span>` : ''}`;
+                const isMfCancelled = isCancelled(mf.status);
 
                 return `
-                    <div class="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 pl-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-300 dark:hover:border-brand-800 transition-all duration-300 overflow-hidden cursor-pointer" onclick="jumpToScheduleForMasterFeature('${mfNameEscaped}')">
+                    <div class="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 pl-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-300 dark:hover:border-brand-800 transition-all duration-300 overflow-hidden cursor-pointer ${isMfCancelled ? 'opacity-60' : ''}" onclick="jumpToScheduleForMasterFeature('${mfNameEscaped}')">
                         <div class="absolute top-0 left-0 w-1.5 h-full ${healthAccentClass(health.level)}"></div>
                         <div class="flex items-start justify-between gap-2 mb-3">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Master-Feature</span>
@@ -1235,7 +1271,7 @@
                             <div class="flex-1 space-y-1.5 min-w-0">
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold inline-block ${statusPillClasses(mf.status)}">${mf.status}</span>
                                 <div class="flex items-center gap-1 text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                                    <i data-lucide="layers" class="w-3 h-3 flex-shrink-0"></i> ${mf.features.length} Feature${mf.features.length === 1 ? '' : 's'}
+                                    <i data-lucide="layers" class="w-3 h-3 flex-shrink-0"></i> ${featureCountLabel}
                                 </div>
                             </div>
                         </div>
@@ -1296,14 +1332,19 @@
             warning: { badge: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400", dot: "bg-amber-500", label: "Warning" }
         };
 
-        // One group per Master-Feature whose own status looks stale relative to its features' actual state
+        // One group per Master-Feature whose own status looks stale relative to its features' actual state,
+        // plus one group per "orphaned" MF whose every Theme is archived but the MF itself is still active.
+        // Cancelled MFs are always skipped; cancelled features are excluded from mismatch counts.
         function collectMismatchGroups(masterFeatures) {
             const groups = [];
 
             masterFeatures.forEach(mf => {
-                const totalFeatures = mf.features.length;
-                const completedCount = mf.features.filter(f => f.status === "Completed").length;
-                const startedCount = mf.features.filter(f => f.progress > 0).length;
+                if (isCancelled(mf.status)) return; // cancelled MFs have no meaningful mismatches
+
+                const activeFeatures = mf.features.filter(f => !isCancelled(f.status));
+                const totalFeatures = activeFeatures.length;
+                const completedCount = activeFeatures.filter(f => f.status === "Completed").length;
+                const startedCount = activeFeatures.filter(f => f.progress > 0).length;
 
                 // Mismatch: Master-Feature marked Completed in Jira, but its features aren't actually all done
                 if (mf.status === "Completed" && mf.progress < 100) {
@@ -1320,8 +1361,19 @@
                     groups.push({
                         id: `mismatch-stale-${slug(mf.name)}`,
                         severity: completedCount > 0 ? "critical" : "warning",
-                        title: `"${mf.name}" is still marked Planned, but ${startedCount}/${totalFeatures} of its features already show progress${completedCount > 0 ? ` (${completedCount} fully completed)` : ''} - its own status may be stale.`,
+                        title: `"${mf.name}" is still marked Planned, but ${startedCount}/${totalFeatures} of its active features already show progress${completedCount > 0 ? ` (${completedCount} fully completed)` : ''} - its own status may be stale.`,
                         items: [{ name: mf.name, kind: "Master-Feature", status: mf.status, progress: mf.progress, note: `${startedCount}/${totalFeatures} features started` }]
+                    });
+                }
+
+                // Orphaned MF: has Themes but ALL of them are archived/cancelled while the MF itself is still active.
+                // This is a structural hint that the Master-Feature itself may need to be cancelled.
+                if (mf.features.length > 0 && activeFeatures.length === 0) {
+                    groups.push({
+                        id: `orphaned-mf-${slug(mf.name)}`,
+                        severity: "warning",
+                        title: `"${mf.name}" has all ${mf.features.length} Theme${mf.features.length === 1 ? '' : 's'} marked as Archived, but the Master-Feature itself is still active — consider closing or cancelling it.`,
+                        items: [{ name: mf.name, kind: "Master-Feature", status: mf.status, progress: mf.progress, note: `${mf.features.length} archived theme${mf.features.length === 1 ? '' : 's'}` }]
                     });
                 }
             });
@@ -1331,12 +1383,14 @@
 
         // One group per (Planned PI, ended-vs-ending-soon) pair - e.g. every still-open item targeting "26-Q2" collapses
         // into a single "N items still open for 26-Q2, which ends in X days" group instead of one card per item.
+        // Cancelled/Archived items are excluded - an archived item can never be "overdue".
         function collectPiDeadlineGroups(masterFeatures) {
             const today = new Date();
             const buckets = {};
 
             function evaluate(itemName, itemKind, piLabel, status, progress) {
                 if (status === "Completed") return;
+                if (isCancelled(status)) return; // archived items have no deadline concerns
                 const entry = resolvePiCalendarEntry(piLabel);
                 if (!entry || !entry.end) return;
 
@@ -1351,8 +1405,14 @@
             }
 
             masterFeatures.forEach(mf => {
-                evaluate(mf.name, "Master-Feature", mf.targetDate, mf.status, mf.progress);
-                mf.features.forEach(f => evaluate(f.name, "Feature", f.date, f.status, f.progress));
+                if (!isCancelled(mf.status)) {
+                    evaluate(mf.name, "Master-Feature", mf.targetDate, mf.status, mf.progress);
+                }
+                mf.features.forEach(f => {
+                    if (!isCancelled(f.status)) {
+                        evaluate(f.name, "Feature", f.date, f.status, f.progress);
+                    }
+                });
             });
 
             return Object.values(buckets).map(bucket => {
@@ -1495,8 +1555,15 @@
             let borderClass = "border-slate-200 dark:border-slate-800";
             let textStatus = "Planned";
             let statusBadgeStyle = "bg-slate-100 dark:bg-slate-800 text-slate-500";
+            let cardOpacity = "";
 
-            if (feat.status === "Completed") {
+            if (isCancelled(feat.status)) {
+                statusColorClass = "bg-slate-200 dark:bg-slate-700";
+                borderClass = "border-slate-100 dark:border-slate-800";
+                textStatus = "Cancelled";
+                statusBadgeStyle = "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500";
+                cardOpacity = "opacity-50";
+            } else if (feat.status === "Completed") {
                 statusColorClass = "bg-emerald-500";
                 borderClass = "border-emerald-100 dark:border-emerald-950";
                 textStatus = "Completed";
@@ -1516,7 +1583,7 @@
             const health = computeFeatureHealth(feat, new Date());
 
             return `
-                <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all">
+                <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all ${cardOpacity}">
                     <div class="flex items-start justify-between gap-1.5">
                         <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${linkifyJiraKeys(feat.name)}</h5>
                         ${healthBadgeHtml(health)}
