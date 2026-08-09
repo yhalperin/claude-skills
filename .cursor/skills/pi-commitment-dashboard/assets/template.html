@@ -115,13 +115,19 @@
   .group-name { font-size: 13px; font-weight: 700; color: var(--indigo); text-transform: uppercase; letter-spacing: 0.5px; }
   .group-count { background: var(--blue-bg); color: var(--blue); border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 600; }
 
-  /* ── Objective sections ── */
-  .objective-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
-  .obj-header { background: var(--surface2); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-  .obj-name { font-size: 13px; font-weight: 700; }
-  .obj-name.unassigned { color: var(--text-dim); font-style: italic; }
-  .obj-count { background: var(--indigo); color: #fff; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
-  .obj-count.unassigned { background: var(--border); color: var(--text-muted); }
+  /* ── Objective picker boxes ── */
+  .obj-picker { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .obj-box { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 14px 18px; cursor: pointer; transition: border-color 0.15s, background 0.15s; min-width: 150px; flex: 1 1 160px; max-width: 260px; user-select: none; }
+  .obj-box:hover { border-color: var(--indigo); background: var(--surface2); }
+  .obj-box.active { border-color: var(--indigo); background: #1e1b4b; }
+  .obj-box.unassigned.active { border-color: var(--border); background: var(--surface2); }
+  .obj-box-name { font-size: 11px; font-weight: 600; line-height: 1.4; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .obj-box-name.all { color: var(--text-dim); }
+  .obj-box-name.unassigned { color: var(--text-dim); font-style: italic; }
+  .obj-box-count { font-size: 26px; font-weight: 800; color: var(--indigo); line-height: 1; }
+  .obj-box.active .obj-box-count { color: #a5b4fc; }
+  .obj-box.unassigned .obj-box-count { color: var(--text-muted); }
+  .obj-box-all-count { font-size: 26px; font-weight: 800; color: var(--text-muted); line-height: 1; }
 
   /* ── Theme rows ── */
   .theme-list { }
@@ -213,6 +219,7 @@
         <option value="All">All Groups</option>
       </select>
     </div>
+    <div id="obj-picker-row"></div>
     <div id="objective-sections"></div>
   </div>
 
@@ -233,6 +240,7 @@
   let currentDivision = "All";
   let currentDrilldown = null;
   let currentGroup = "All";
+  let currentObjective = "All";
 
   // ── Boot ──
   document.getElementById("fetch-badge").textContent = "Jira Data as of " + JIRA_FETCH_TS;
@@ -405,10 +413,9 @@
 
     const stats = divisionStats(THEMES, division);
     const color = pctColor(stats.pct);
-
     const sc = statusCountsForDivision(division);
-    const statsBar = document.getElementById("drilldown-stats");
-    statsBar.innerHTML = `
+
+    document.getElementById("drilldown-stats").innerHTML = `
       <div><div class="ds-label">Division</div><div class="ds-value">${escHtml(division)}</div></div>
       <div><div class="ds-label">Committed</div><div class="ds-value">${stats.committed}</div></div>
       <div><div class="ds-label">Total</div><div class="ds-value">${stats.total}</div></div>
@@ -421,12 +428,58 @@
 
     populateGroupFilter(division);
 
-    // Committed themes, optionally filtered by group
+    // Committed themes for this division, optionally filtered by group
     let committedThemes = stats.themes.filter(t => t.committed);
     if (currentGroup !== "All") {
       committedThemes = committedThemes.filter(t => t.group === currentGroup);
     }
 
+    // ── Build objective index (across all themes, ignoring currentObjective) ──
+    const byObj = {};
+    committedThemes.forEach(t => {
+      const ok = t.objectiveName || "__unassigned__";
+      if (!byObj[ok]) byObj[ok] = [];
+      byObj[ok].push(t);
+    });
+    const namedObjKeys = Object.keys(byObj).filter(k => k !== "__unassigned__").sort();
+    const allObjKeys = byObj["__unassigned__"]
+      ? namedObjKeys.concat(["__unassigned__"])
+      : namedObjKeys;
+
+    // ── Render objective picker boxes ──
+    const pickerRow = document.getElementById("obj-picker-row");
+    pickerRow.innerHTML = "";
+
+    if (committedThemes.length > 0) {
+      const picker = document.createElement("div");
+      picker.className = "obj-picker";
+
+      // "All" box
+      const allBox = document.createElement("div");
+      allBox.className = "obj-box" + (currentObjective === "All" ? " active" : "");
+      allBox.innerHTML = `<div class="obj-box-name all">All Objectives</div><div class="obj-box-all-count">${committedThemes.length}</div>`;
+      allBox.onclick = () => { currentObjective = "All"; renderDrilldown(division); };
+      picker.appendChild(allBox);
+
+      allObjKeys.forEach(ok => {
+        const isUnassigned = ok === "__unassigned__";
+        const label = isUnassigned ? "Unassigned" : ok;
+        const count = byObj[ok].length;
+        const isActive = currentObjective === ok;
+        const box = document.createElement("div");
+        box.className = "obj-box" + (isUnassigned ? " unassigned" : "") + (isActive ? " active" : "");
+        box.innerHTML = `
+          <div class="obj-box-name ${isUnassigned ? 'unassigned' : ''}">${escHtml(label)}</div>
+          <div class="obj-box-count">${count}</div>
+        `;
+        box.onclick = () => { currentObjective = ok; renderDrilldown(division); };
+        picker.appendChild(box);
+      });
+
+      pickerRow.appendChild(picker);
+    }
+
+    // ── Render theme list ──
     const container = document.getElementById("objective-sections");
     container.innerHTML = "";
 
@@ -435,32 +488,36 @@
       return;
     }
 
-    // Determine swimlane grouping:
-    // if a group filter is active → single swimlane (no header needed)
-    // otherwise → one swimlane per group
-    const useSwimlanes = currentGroup === "All";
+    // Filter by selected objective
+    const visibleThemes = currentObjective === "All"
+      ? committedThemes
+      : committedThemes.filter(t => (t.objectiveName || "__unassigned__") === currentObjective);
 
-    // Bucket themes by group
+    if (visibleThemes.length === 0) {
+      container.innerHTML = `<div class="empty-state"><p>No themes for this objective.</p></div>`;
+      return;
+    }
+
+    // Group by swimlane (group field), then render flat theme list inside each
+    const useSwimlanes = currentGroup === "All";
     const byGroup = {};
-    committedThemes.forEach(t => {
+    visibleThemes.forEach(t => {
       const gk = t.group || "__nogroup__";
       if (!byGroup[gk]) byGroup[gk] = [];
       byGroup[gk].push(t);
     });
-
     const groupKeys = useSwimlanes
       ? Object.keys(byGroup).filter(k => k !== "__nogroup__").sort().concat(byGroup["__nogroup__"] ? ["__nogroup__"] : [])
       : ["__all__"];
+    if (!useSwimlanes) byGroup["__all__"] = visibleThemes;
 
-    if (!useSwimlanes) byGroup["__all__"] = committedThemes;
+    // Outer section card
+    const section = document.createElement("div");
+    section.className = "objective-section";
 
     groupKeys.forEach(gk => {
       const groupThemes = byGroup[gk];
       if (!groupThemes || groupThemes.length === 0) return;
-
-      // ── Swimlane wrapper ──
-      const swimlane = document.createElement("div");
-      swimlane.className = "group-swimlane";
 
       if (useSwimlanes) {
         const gh = document.createElement("div");
@@ -470,72 +527,43 @@
           <span class="group-name">${escHtml(gLabel)}</span>
           <span class="group-count">${groupThemes.length} theme${groupThemes.length !== 1 ? 's' : ''}</span>
         `;
-        swimlane.appendChild(gh);
+        section.appendChild(gh);
       }
 
-      // Group themes by objective within this swimlane
-      const byObj = {};
+      const list = document.createElement("div");
+      list.className = "theme-list";
       groupThemes.forEach(t => {
-        const ok = t.objectiveName || "__unassigned__";
-        if (!byObj[ok]) byObj[ok] = [];
-        byObj[ok].push(t);
-      });
-
-      const objKeys = Object.keys(byObj).filter(k => k !== "__unassigned__").sort();
-      if (byObj["__unassigned__"]) objKeys.push("__unassigned__");
-
-      objKeys.forEach(objKey => {
-        const isUnassigned = objKey === "__unassigned__";
-        const label = isUnassigned ? "Unassigned" : objKey;
-        const themes = byObj[objKey];
-
-        const section = document.createElement("div");
-        section.className = "objective-section";
-
-        const header = document.createElement("div");
-        header.className = "obj-header";
-        header.innerHTML = `
-          <span class="obj-name ${isUnassigned ? 'unassigned' : ''}">${escHtml(label)}</span>
-          <span class="obj-count ${isUnassigned ? 'unassigned' : ''}">${themes.length} theme${themes.length !== 1 ? 's' : ''}</span>
-        `;
-        section.appendChild(header);
-
-        const list = document.createElement("div");
-        list.className = "theme-list";
-
-        themes.forEach(t => {
-          const fColor = finishColor(t.finishDate);
-          const fLabel = finishLabel(t.finishDate);
-          const row = document.createElement("div");
-          row.className = "theme-row";
-          const objHtml = (!isUnassigned && useSwimlanes && t.objectiveName)
-            ? `<span class="obj-pill" title="${escHtml(t.objectiveName)}">${escHtml(t.objectiveName)}</span>`
-            : "";
-          row.innerHTML = `
-            <div class="theme-id"><a href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.id)}</a></div>
-            <div class="theme-body">
-              <div class="theme-title">${escHtml(t.title)}</div>
-              <div class="theme-meta">
-                <span class="finish-chip ${fColor}">${escHtml(fLabel)}</span>
-                ${objHtml}
-              </div>
+        const fColor = finishColor(t.finishDate);
+        const fLabel = finishLabel(t.finishDate);
+        const row = document.createElement("div");
+        row.className = "theme-row";
+        // Show objective pill only when viewing all objectives
+        const objHtml = (currentObjective === "All" && t.objectiveName)
+          ? `<span class="obj-pill" title="${escHtml(t.objectiveName)}">${escHtml(t.objectiveName)}</span>`
+          : "";
+        row.innerHTML = `
+          <div class="theme-id"><a href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.id)}</a></div>
+          <div class="theme-body">
+            <div class="theme-title">${escHtml(t.title)}</div>
+            <div class="theme-meta">
+              <span class="finish-chip ${fColor}">${escHtml(fLabel)}</span>
+              ${objHtml}
             </div>
-          `;
-          list.appendChild(row);
-        });
-
-        section.appendChild(list);
-        swimlane.appendChild(section);
+          </div>
+        `;
+        list.appendChild(row);
       });
-
-      container.appendChild(swimlane);
+      section.appendChild(list);
     });
+
+    container.appendChild(section);
   }
 
   // ── Navigation ──
   function showSummary() {
     currentDrilldown = null;
     currentGroup = "All";
+    currentObjective = "All";
     document.getElementById("summary-view").classList.remove("hidden");
     document.getElementById("drilldown-view").classList.remove("active");
     renderSummary(currentDivision);
@@ -543,6 +571,7 @@
 
   function showDrilldown(division) {
     currentGroup = "All";
+    currentObjective = "All";
     currentDrilldown = division;
     document.getElementById("summary-view").classList.add("hidden");
     document.getElementById("drilldown-view").classList.add("active");
@@ -555,6 +584,7 @@
 
   window.applyGroupFilter = function(group) {
     currentGroup = group;
+    currentObjective = "All";
     if (currentDrilldown) renderDrilldown(currentDrilldown);
   };
 
