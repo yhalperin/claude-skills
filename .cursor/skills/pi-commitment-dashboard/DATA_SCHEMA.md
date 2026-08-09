@@ -24,10 +24,10 @@ Flat JSON array, one entry per Jira Theme issue:
 | `id` | string | issue key | e.g. `"AGAI-1440"` |
 | `title` | string | `summary` | HTML-entity-decoded |
 | `divisions` | string[] | `customfield_22721` | HTML-decoded. Usually 1 item, can fan-out. Empty array if unset. |
-| `committed` | boolean | derived | `true` if `commitmentLevel == "Committed"` (case-insensitive) |
-| `commitmentLevel` | string \| null | `customfield_13641` | Raw option value or `null` if unset |
-| `finishDate` | string \| null | `customfield_21223` | ISO date `YYYY-MM-DD` or `null` |
-| `objectiveName` | string \| null | `customfield_22820` | Raw option value ("Strategic Area") or `null` |
+| `committed` | boolean | derived | `true` if `commitmentLevel == "Commitment"` (the actual Jira value) |
+| `commitmentLevel` | string \| null | `customfield_13641` | Raw option value (`"Commitment"`, `"Stretch"`, `"Normal"`) or `null` |
+| `finishDate` | string \| null | `customfield_21221` | ISO date `YYYY-MM-DD` or `null` |
+| `objectiveName` | string \| null | `customfield_20928` | "Initiative Name" text field or `null` (most themes have null) |
 | `url` | string | constructed | `https://ca-il-jira.il.cyber-ark.com:8443/browse/<id>` |
 
 ## Snapshot Metadata

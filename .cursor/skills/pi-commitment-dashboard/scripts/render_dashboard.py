@@ -49,6 +49,10 @@ def main() -> int:
     parser.add_argument("--themes", required=True, help="Path to themes JSON array")
     parser.add_argument("--pi", required=True, help='Target PI label, e.g. "27-Q1"')
     parser.add_argument("--fetched-at", dest="fetched_at", default=None)
+    parser.add_argument("--division-totals", dest="division_totals", default=None,
+                        help="Path to JSON object mapping division name -> total theme count")
+    parser.add_argument("--status-themes", dest="status_themes", default=None,
+                        help="Path to JSON array of {id, divisions, status} for Planned/In Progress themes")
     parser.add_argument("--division", default="All")
     parser.add_argument("--out", default=None)
     parser.add_argument("--no-open", action="store_true")
@@ -71,6 +75,30 @@ def main() -> int:
         print("ERROR: themes file must be a non-empty JSON array", file=sys.stderr)
         return 1
 
+    status_themes = []
+    if args.status_themes:
+        st_path = Path(args.status_themes)
+        if not st_path.exists():
+            print(f"ERROR: status-themes file not found: {st_path}", file=sys.stderr)
+            return 1
+        try:
+            status_themes = json.loads(st_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            print(f"ERROR: invalid JSON in status-themes file: {exc}", file=sys.stderr)
+            return 1
+
+    division_totals = {}
+    if args.division_totals:
+        dt_path = Path(args.division_totals)
+        if not dt_path.exists():
+            print(f"ERROR: division-totals file not found: {dt_path}", file=sys.stderr)
+            return 1
+        try:
+            division_totals = json.loads(dt_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            print(f"ERROR: invalid JSON in division-totals file: {exc}", file=sys.stderr)
+            return 1
+
     rendered_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     if args.fetched_at:
         jira_fetch_ts = args.fetched_at
@@ -86,6 +114,8 @@ def main() -> int:
 
     output = template
     output = output.replace("__THEMES_JSON__", json_embed(themes))
+    output = output.replace("__DIVISION_TOTALS_JSON__", json_embed(division_totals))
+    output = output.replace("__STATUS_THEMES_JSON__", json_embed(status_themes))
     output = output.replace("__TARGET_PI__", json_embed(args.pi))
     output = output.replace("__JIRA_FETCH_TS__", json_embed(jira_fetch_ts))
     output = output.replace("__SNAPSHOT_TS__", json_embed(rendered_ts))

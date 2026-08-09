@@ -35,9 +35,9 @@ robocopy "C:\Users\yhalperin\.claude\skills\pi-commitment-dashboard" "C:\Users\y
 |---|---|---|
 | Divisions | `customfield_22721` | multi-select array |
 | PlannedPI | `customfield_14422` | e.g. `"27-Q1"` |
-| Commitment Level | `customfield_13641` | single-select; committed = value is `"Committed"` |
-| Finish Date | `customfield_21223` | date field, ISO format `YYYY-MM-DD` or null |
-| Strategic Area | `customfield_22820` | single-select; maps Theme to one of 5-6 objectives |
+| Commitment Level | `customfield_13641` | single-select; committed = value is `"Commitment"` |
+| Finish Date | `customfield_21221` | date field, ISO format `YYYY-MM-DD` or null |
+| Initiative Name | `customfield_20928` | text field; groups Themes into objectives (often null) |
 | Base URL | `https://ca-il-jira.il.cyber-ark.com:8443` | used for issue links |
 
 Always go through `user-policy-broker` MCP; never bypass.
@@ -86,7 +86,7 @@ If a specific Division is requested, append: `AND cf[22721] = "<Division>"`.
 **Step 3 — Fetch from Jira**
 
 Via `user-policy-broker` MCP `jira_search`:
-- Fields: `key,summary,customfield_22721,customfield_13641,customfield_21223,customfield_22820`
+- Fields: `key,summary,customfield_22721,customfield_13641,customfield_21221,customfield_20928`
 - Paginate at `limit=25` (`start_at` 0, 25, 50, ...)
 - After each page, accumulate results
 - Decode HTML entities (`&amp;` → `&`) during transform
@@ -94,10 +94,10 @@ Via `user-policy-broker` MCP `jira_search`:
 
 **Step 4 — Transform and assemble** into schema per DATA_SCHEMA.md:
 - `status` is not needed for this dashboard; omit
-- `committed` = `true` if `customfield_13641` value equals `"Committed"` (case-insensitive), else `false`
+- `committed` = `true` if `customfield_13641` value equals `"Commitment"` (case-insensitive), else `false`
 - `divisions` = array from `customfield_22721`; empty array if null
-- `finishDate` = `customfield_21223` date value (string `YYYY-MM-DD`) or `null`
-- `objectiveName` = `customfield_22820` option value or `null`
+- `finishDate` = `customfield_21221` date value (string `YYYY-MM-DD`) or `null`
+- `objectiveName` = `customfield_20928` text value ("Initiative Name") or `null`
 - `url` = `<base_url>/browse/<key>`
 - Verify `len(array) == total` and no duplicate `id`s
 
@@ -106,11 +106,34 @@ Via `user-policy-broker` MCP `jira_search`:
 Write transformed array to a scratch file, e.g.:
 `C:\Users\yhalperin\AppData\Local\Temp\pi_commitment_themes.json`
 
+**Step 5b — Derive status themes (Planned + In Progress)**
+
+From the same raw Jira data already fetched in Step 3, extract every theme whose
+status is `"Planned"` or `"In Progress"`. Transform each into a slim object:
+```json
+{"id": "KEY-123", "divisions": ["Division A"], "status": "Planned"}
+```
+Write to: `C:\Users\yhalperin\AppData\Local\Temp\pi_status_themes.json`
+This drives the "In-flight" second bar shown on each division row in the summary.
+
+**Step 5c — Fetch division totals**
+
+For each unique division found in Step 3, query with `limit=1` to get just the `total` count:
+```
+JQL: issuetype = Theme AND cf[14422] = "<PI>" AND cf[22721] = "<Division>" ORDER BY key
+```
+Also query without division filter for `__all__`. Write results to a JSON file:
+```json
+{"IGA": 56, "AI data and Labs": 69, ..., "__all__": 1334}
+```
+
 **Step 6 — Render**
 
 ```bash
 python "C:\Users\yhalperin\.claude\skills\pi-commitment-dashboard\scripts\render_dashboard.py" \
   --themes "C:\Users\yhalperin\AppData\Local\Temp\pi_commitment_themes.json" \
+  --division-totals "C:\Users\yhalperin\AppData\Local\Temp\pi_commitment_div_totals.json" \
+  --status-themes "C:\Users\yhalperin\AppData\Local\Temp\pi_status_themes.json" \
   --pi "27-Q1" \
   --fetched-at "YYYY-MM-DD HH:MM"
 ```

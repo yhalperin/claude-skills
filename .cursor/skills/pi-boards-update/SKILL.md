@@ -138,7 +138,20 @@ Notes:
 - `finishDate` = `customfield_21221` date string or `null`
 - `objectiveName` = `customfield_20928` text value or `null`
 
-### Step 5b — Fetch division totals for Commitment dashboard
+### Step 5b — Derive the status themes file (Planned + In Progress)
+
+From the same raw data in Step 3, extract every theme whose `status` is
+`"Planned"` or `"In Progress"`. Write slim objects to:
+`C:\Users\yhalperin\AppData\Local\Temp\pi_status_themes.json`
+
+```json
+[{"id": "KEY-123", "divisions": ["Division A"], "status": "Planned"}, ...]
+```
+
+This drives the "In-flight" second progress bar on each division row in the
+Commitment dashboard summary view.
+
+### Step 5c — Fetch division totals for Commitment dashboard
 
 For each unique division name found in the full raw dataset (Step 3), fetch just
 the total count with `limit=1`:
@@ -190,6 +203,7 @@ This pushes to `main` of `pi-readiness-dashboard-site`. The live URL is:
 python "C:\Users\yhalperin\.claude\skills\pi-commitment-dashboard\scripts\render_dashboard.py" \
   --themes "C:\Users\yhalperin\AppData\Local\Temp\pi_commitment_themes.json" \
   --division-totals "C:\Users\yhalperin\AppData\Local\Temp\pi_commitment_div_totals.json" \
+  --status-themes "C:\Users\yhalperin\AppData\Local\Temp\pi_status_themes.json" \
   --pi "<PI>" \
   --fetched-at "<FETCHED_AT>"
 ```
