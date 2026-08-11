@@ -913,6 +913,11 @@
             if (isCancelled(status)) return { level: "good", reason: null };
             if (status === "Blocked") return { level: "at-risk", reason: "Marked Blocked in Jira." };
 
+            // No Planned PI set — any non-completed item has no delivery target, always a warning
+            if (!piLabel || piLabel === "N/A" || piLabel === "TBD" || piLabel === "") {
+                return { level: "warning", reason: "No Planned PI assigned — delivery timeline is undefined." };
+            }
+
             const entry = resolvePiCalendarEntry(piLabel);
             if (!entry || !entry.end) return { level: "good", reason: null }; // no PI dates to judge by - don't guess
 
@@ -923,6 +928,28 @@
                 const days = Math.abs(daysLeft);
                 return { level: "at-risk", reason: `Planned PI ${piLabel} ended ${days} day${days === 1 ? '' : 's'} ago, but this is still ${status}.` };
             }
+
+            // PI is active — grade urgency by how much of the PI has already elapsed.
+            // < 50% elapsed: still early, no additional flag for a not-started item.
+            // 50–70% elapsed: over halfway through with nothing started → Warning.
+            // > 70% elapsed: PI nearly over with nothing started → At Risk.
+            if (entry.start && status === "Planned") {
+                const piStart = new Date(entry.start + "T00:00:00");
+                if (today >= piStart) {
+                    const totalDays = daysBetween(piStart, end); // end already computed above
+                    const elapsedDays = daysBetween(piStart, today);
+                    const elapsedPct = totalDays > 0 ? elapsedDays / totalDays : 0;
+                    const elapsedPctDisplay = Math.round(elapsedPct * 100);
+                    if (elapsedPct >= 0.70) {
+                        return { level: "at-risk", reason: `PI ${piLabel} is ${elapsedPctDisplay}% elapsed and this item has not been started yet.` };
+                    }
+                    if (elapsedPct >= 0.50) {
+                        return { level: "warning", reason: `PI ${piLabel} is ${elapsedPctDisplay}% elapsed and this item has not been started yet.` };
+                    }
+                    // < 50% elapsed — still early in the PI, no flag
+                }
+            }
+
             if (daysLeft <= PI_DEADLINE_SOON_DAYS) {
                 return { level: "warning", reason: `Planned PI ${piLabel} ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}, and this is still ${status}.` };
             }
@@ -1389,7 +1416,7 @@
                                 <span class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-slate-700 dark:text-slate-200">${mf.progress}%</span>
                             </div>
                             <div class="flex-1 space-y-1.5 min-w-0">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold inline-block ${statusPillClasses(mf.status)}">${mf.status}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold inline-block ${statusPillClasses(mf.status)}">${mf.jiraStatus || mf.status}</span>
                                 <div class="flex items-center gap-1 text-[10px] font-mono text-slate-400 dark:text-slate-500">
                                     <i data-lucide="layers" class="w-3 h-3 flex-shrink-0"></i> ${featureCountLabel}
                                 </div>
@@ -1595,12 +1622,51 @@
             }];
         }
 
+        // Collect active items (non-completed, non-cancelled) that have no Planned PI set.
+        // These have no delivery commitment and should always surface as a Warning insight.
+        function collectNoPlannedPiInsight(masterFeatures) {
+            const items = [];
+            masterFeatures.forEach(mf => {
+                if (isCancelled(mf.status)) return;
+                mf.features.forEach(f => {
+                    if (isCancelled(f.status) || f.status === "Completed") return;
+                    if (!f.date || f.date === "N/A" || f.date === "TBD") {
+                        items.push({
+                            name: f.name,
+                            kind: "Theme",
+                            status: f.jiraStatus || f.status,
+                            progress: f.progress,
+                            note: "No Planned PI assigned — no delivery commitment"
+                        });
+                    }
+                });
+                // Flag the MF itself only if it also has no target date (separate from its children)
+                if (!mf.targetDate || mf.targetDate === "N/A" || mf.targetDate === "TBD") {
+                    items.push({
+                        name: mf.name,
+                        kind: "Master Feature",
+                        status: mf.jiraStatus || mf.status,
+                        progress: mf.progress,
+                        note: "No Planned PI assigned — no delivery commitment"
+                    });
+                }
+            });
+            if (items.length === 0) return [];
+            return [{
+                id: "no-planned-pi",
+                severity: "warning",
+                title: `${items.length} item${items.length === 1 ? '' : 's'} ${items.length === 1 ? 'has' : 'have'} no Planned PI — delivery timeline is undefined.`,
+                items,
+            }];
+        }
+
         function computeInsightGroups(data) {
             const groups = [
                 ...collectMismatchGroups(data.masterFeatures),
                 ...collectPiDeadlineGroups(data.masterFeatures),
                 ...collectTimelineMismatchGroup(data),
                 ...collectNoGroupWarnings(data.masterFeatures),
+                ...collectNoPlannedPiInsight(data.masterFeatures),
             ];
             const severityOrder = { critical: 0, warning: 1 };
             return groups.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
@@ -1730,6 +1796,8 @@
                 textStatus = "Blocked";
                 statusBadgeStyle = "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900";
             }
+            // Display the raw Jira status label when available; fall back to the mapped category for legacy data
+            const displayStatus = feat.jiraStatus || textStatus;
 
             const health = computeFeatureHealth(feat, new Date());
 
@@ -1765,7 +1833,7 @@
                     </div>
                     <div class="pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-1 mt-2">
                         <span class="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 dark:bg-slate-800/80 px-1 rounded">${footerLabel || 'TBD'}</span>
-                        <span class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusBadgeStyle}">${textStatus}</span>
+                        <span class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${statusBadgeStyle}">${displayStatus}</span>
                     </div>
                     <div class="mt-2 w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
                         <div class="${statusColorClass} h-1 rounded-full" style="width: ${feat.progress}%;"></div>
