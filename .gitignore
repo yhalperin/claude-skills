@@ -7,3 +7,4 @@ tmp/
 __pycache__/
 *.pyc
 .DS_Store
+_commit_msg.txt
