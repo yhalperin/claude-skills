@@ -347,6 +347,28 @@
 
                 </div>
 
+                <!-- Initiative Description + Readiness Panel (shown by JS when data is present) -->
+                <div id="initiative-overview-panel" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                    <div class="flex flex-col sm:flex-row gap-6">
+                        <!-- Description column -->
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-2">
+                                <i data-lucide="info" class="w-4 h-4 text-brand-400"></i>
+                                About this Initiative
+                            </h3>
+                            <p id="initiative-description-text" class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed"></p>
+                        </div>
+                        <!-- Readiness column -->
+                        <div id="initiative-readiness-col" class="flex-shrink-0 hidden sm:block sm:border-l sm:border-slate-100 dark:sm:border-slate-800 sm:pl-6">
+                            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-3">
+                                <i data-lucide="shield-check" class="w-4 h-4 text-brand-400"></i>
+                                Readiness
+                            </h3>
+                            <div id="initiative-readiness-list" class="space-y-1.5"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Automated Insights Panel: status/progress mismatches, Planned-PI deadline risks, and Initiative
                      timeline slippage (latest Planned PI vs Jira Delivery Target), detected live from the data below
                      plus the current date - not persisted, recalculated fresh on every render/page load -->
@@ -402,18 +424,24 @@
                         </div>
                     </div>
 
-                    <!-- Multi-select Group filter -->
+                    <!-- Multi-select Group filter + dependency-line toggle -->
                     <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex-shrink-0">Filter by Group:</span>
-                        <div id="schedule-group-filter-container" class="flex flex-wrap gap-1.5">
+                        <div id="schedule-group-filter-container" class="flex flex-wrap gap-1.5 flex-1">
                             <!-- Dynamic multi-select group toggle pills -->
                         </div>
+                        <!-- Toggle dependency lines between Themes within the same Master-Feature row -->
+                        <button id="dep-lines-toggle-btn" onclick="toggleDepLines()"
+                            title="Show / hide dependency lines between Themes within the same Master-Feature"
+                            class="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">
+                            <i data-lucide="git-merge" class="w-3 h-3"></i> Dependencies
+                        </button>
                     </div>
                 </div>
 
                 <!-- PI Schedule Matrix Grid -->
                 <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto" id="schedule-table-scroll">
                         <table class="w-full border-collapse text-left text-xs min-w-[900px]">
                             <thead>
                                 <tr id="schedule-header-row" class="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-850">
@@ -434,6 +462,8 @@
                             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span> In Progress Feature (1-99%)</span>
                             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-rose-500"></span> Blocked Feature (Stalled)</span>
                             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-slate-300 dark:bg-slate-600"></span> Planned Feature (0%)</span>
+                            <span class="flex items-center gap-1.5"><span class="inline-block w-6 border-t-2 border-dashed border-indigo-400"></span> Depends on (same MF)</span>
+                            <span class="flex items-center gap-1.5"><span class="inline-block w-6 border-t-2 border-dashed border-rose-400"></span> Blocks (same MF)</span>
                         </div>
                         <span class="text-slate-400 font-medium">Columns are each Feature's own Planned PI, sorted chronologically left to right (a "TBD" column collects unscheduled features). Health badges: <span class="text-emerald-500 font-semibold">Good</span> / <span class="text-amber-500 font-semibold">Warning</span> / <span class="text-rose-500 font-semibold">At Risk</span>.</span>
                     </div>
@@ -541,6 +571,8 @@
         let currentInitiativeKey = Object.keys(INITIATIVE_DATA)[0];
         let activeMasterFeatureFilter = null; // Isolates one Master-Feature row on the PI Delivery Schedule
         let activeGroupFilters = new Set(); // Multi-select Group filter on the PI Delivery Schedule; empty = show all groups
+        let showDependencyLines = false; // Whether dependency-link lines are overlaid on the PI Delivery Schedule
+        let depLineSvg = null; // Live reference to the SVG overlay element
 
         // Whether the multi-initiative Overview landing page exists at all for this dashboard - a single-initiative
         // dashboard never shows it (goes straight to the detail view, exactly as before this feature existed).
@@ -1073,6 +1105,7 @@
             }
 
             // Render Dynamic components
+            renderInitiativeOverviewPanel(data);
             renderGroupWorkloadDistribution(data.masterFeatures);
             renderMilestonesGrid(data.masterFeatures);
             renderGroupFilterPills(data.masterFeatures);
@@ -1082,6 +1115,59 @@
 
             // Trigger lucide icon compilation
             lucide.createIcons();
+        }
+
+        // Renders the "About this Initiative" + Readiness panel if the initiative data contains
+        // a description or readiness fields. Hidden entirely when neither is present (backward compatible).
+        function renderInitiativeOverviewPanel(data) {
+            const panel = document.getElementById('initiative-overview-panel');
+            const descEl = document.getElementById('initiative-description-text');
+            const readinessCol = document.getElementById('initiative-readiness-col');
+            const readinessList = document.getElementById('initiative-readiness-list');
+            if (!panel) return;
+
+            const hasDesc = data.description && data.description.trim().length > 0;
+            const hasReadiness = data.readiness && typeof data.readiness === 'object';
+
+            if (!hasDesc && !hasReadiness) {
+                panel.classList.add('hidden');
+                return;
+            }
+            panel.classList.remove('hidden');
+
+            // Description
+            if (hasDesc) {
+                descEl.textContent = data.description;
+            } else {
+                descEl.textContent = '';
+                descEl.closest('.flex-1') && (descEl.closest('.flex-1').style.display = 'none');
+            }
+
+            // Readiness
+            if (hasReadiness) {
+                readinessCol.classList.remove('hidden');
+                readinessCol.classList.add('sm:block');
+                const items = [
+                    { key: 'requirements', label: 'Requirements (PRD)', icon: 'file-text' },
+                    { key: 'techSolution', label: 'Tech Solution', icon: 'cpu' },
+                    { key: 'architecture', label: 'Architecture', icon: 'layers' },
+                ];
+                readinessList.innerHTML = items.map(item => {
+                    const doc = data.readiness[item.key];
+                    const ok = doc && doc.status === 'ok';
+                    const dotCls = ok ? 'bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600';
+                    const textCls = ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500';
+                    const linkHtml = ok && doc.link
+                        ? `<a href="${doc.link}" target="_blank" class="ml-1 text-brand-500 hover:underline text-[10px]">↗</a>`
+                        : '';
+                    return `<div class="flex items-center gap-2 text-xs">
+                        <span class="w-2 h-2 rounded-full flex-shrink-0 ${dotCls}"></span>
+                        <span class="${textCls} font-medium">${item.label}</span>${linkHtml}
+                    </div>`;
+                }).join('');
+            } else {
+                readinessCol.classList.add('hidden');
+            }
         }
 
         // Calculate direct features aggregates from loaded milestones structure.
@@ -1143,7 +1229,7 @@
                 if (isCancelled(mf.status)) return;
                 mf.features.forEach(f => {
                     if (isCancelled(f.status)) return;
-                    if (!groups.includes(f.group)) groups.push(f.group);
+                    if (f.group && !groups.includes(f.group)) groups.push(f.group); // null/empty → no group pill
                 });
             });
             return groups;
@@ -1164,6 +1250,7 @@
                 if (isCancelled(mf.status)) return;
                 mf.features.forEach(f => {
                     if (isCancelled(f.status)) return;
+                    if (!f.group) return; // null-group themes excluded from distribution
                     counts[f.group] = (counts[f.group] || 0) + 1;
                     total++;
                 });
@@ -1242,6 +1329,35 @@
             const ringRadius = 24;
             const circumference = 2 * Math.PI * ringRadius;
 
+            function readinessBadgesHtml(r) {
+                if (!r) return '';
+                const items = [
+                    { key: 'requirements', label: 'PRD' },
+                    { key: 'techSolution', label: 'Tech' },
+                    { key: 'architecture', label: 'Arch' },
+                ];
+                const parts = items.map(item => {
+                    const doc = r[item.key];
+                    const ok = doc && doc.status === 'ok';
+                    const okCls = 'text-emerald-500 dark:text-emerald-400';
+                    const missCls = 'text-slate-300 dark:text-slate-600';
+                    const icon = ok ? '✓' : '✗';
+                    if (ok && doc.link) {
+                        return `<a href="${doc.link}" target="_blank" onclick="event.stopPropagation()" title="${item.label} — click to open" class="flex items-center gap-0.5 ${okCls} hover:underline">${icon} ${item.label}</a>`;
+                    }
+                    return `<span class="flex items-center gap-0.5 ${ok ? okCls : missCls}" title="${item.label} not set">${icon} ${item.label}</span>`;
+                });
+                const allOk = items.every(i => r[i.key] && r[i.key].status === 'ok');
+                const anyOk = items.some(i => r[i.key] && r[i.key].status === 'ok');
+                const overallCls = allOk ? 'text-emerald-600 dark:text-emerald-400 font-bold' : anyOk ? 'text-amber-500 dark:text-amber-400 font-bold' : 'text-slate-400 dark:text-slate-500';
+                const overallLabel = allOk ? 'Ready' : anyOk ? 'Partial' : 'Docs missing';
+                return `
+                    <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-[10px] font-semibold">
+                        <div class="flex items-center gap-2.5">${parts.join('')}</div>
+                        <span class="${overallCls}">${overallLabel}</span>
+                    </div>`;
+            }
+
             function buildMilestoneCardHtml(mf) {
                 const health = computeMasterFeatureHealth(mf, today);
                 const clampedProgress = Math.min(Math.max(mf.progress, 0), 100);
@@ -1251,6 +1367,9 @@
                 const cancelledFeatureCount = mf.features.length - activeFeatureCount;
                 const featureCountLabel = `${activeFeatureCount} Feature${activeFeatureCount === 1 ? '' : 's'}${cancelledFeatureCount > 0 ? ` <span class="text-slate-300 dark:text-slate-600">(${cancelledFeatureCount} archived)</span>` : ''}`;
                 const isMfCancelled = isCancelled(mf.status);
+                const descHtml = mf.description
+                    ? `<p class="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mb-3 line-clamp-2">${mf.description}</p>`
+                    : `<div class="mb-3"></div>`;
 
                 return `
                     <div class="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 pl-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-300 dark:hover:border-brand-800 transition-all duration-300 overflow-hidden cursor-pointer ${isMfCancelled ? 'opacity-60' : ''}" onclick="jumpToScheduleForMasterFeature('${mfNameEscaped}')">
@@ -1259,7 +1378,8 @@
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Master-Feature</span>
                             ${healthBadgeHtml(health)}
                         </div>
-                        <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug mb-4 line-clamp-2 min-h-[2.5rem]">${linkifyJiraKeys(mf.name)}</h4>
+                        <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug mb-1 line-clamp-2 min-h-[2.5rem]">${linkifyJiraKeys(mf.name)}</h4>
+                        ${descHtml}
                         <div class="flex items-center gap-3.5">
                             <div class="relative w-14 h-14 flex-shrink-0">
                                 <svg class="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
@@ -1275,7 +1395,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center gap-1 text-[10px] font-semibold text-brand-500 dark:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        ${readinessBadgesHtml(mf.readiness)}
+                        <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center gap-1 text-[10px] font-semibold text-brand-500 dark:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity">
                             <i data-lucide="calendar-range" class="w-3 h-3"></i> View in PI Delivery Schedule &rarr;
                         </div>
                     </div>
@@ -1445,11 +1566,41 @@
 
         // Full insight sweep across one initiative: Master-Feature/Feature mismatches, PI deadline risk, and the
         // Initiative-level Delivery-Target-vs-Planned-PI check, sorted critical-first
+        // Returns a single Warning insight group listing every active, non-cancelled Theme
+        // that has no Group assigned in Jira.  An empty array is returned when all themes
+        // have a group so this never pollutes a clean dashboard.
+        function collectNoGroupWarnings(masterFeatures) {
+            const ungrouped = [];
+            masterFeatures.forEach(mf => {
+                if (isCancelled(mf.status)) return;
+                mf.features.forEach(f => {
+                    if (isCancelled(f.status)) return;
+                    if (!f.group) {
+                        ungrouped.push({
+                            name: f.name,
+                            kind: "Feature",
+                            status: f.status,
+                            progress: f.progress,
+                            note: "No Group assigned in Jira"
+                        });
+                    }
+                });
+            });
+            if (ungrouped.length === 0) return [];
+            return [{
+                id: "no-group-assigned",
+                severity: "warning",
+                title: `${ungrouped.length} Theme${ungrouped.length === 1 ? '' : 's'} ${ungrouped.length === 1 ? 'has' : 'have'} no Group assigned — set the Group field in Jira so workload distribution and group filtering work correctly.`,
+                items: ungrouped
+            }];
+        }
+
         function computeInsightGroups(data) {
             const groups = [
                 ...collectMismatchGroups(data.masterFeatures),
                 ...collectPiDeadlineGroups(data.masterFeatures),
-                ...collectTimelineMismatchGroup(data)
+                ...collectTimelineMismatchGroup(data),
+                ...collectNoGroupWarnings(data.masterFeatures),
             ];
             const severityOrder = { critical: 0, warning: 1 };
             return groups.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
@@ -1582,8 +1733,32 @@
 
             const health = computeFeatureHealth(feat, new Date());
 
+            // Extract the Jira key from the feature name, e.g. "Some Theme (KEY-123)" → "KEY-123"
+            const keyM = /\(([A-Z]+-\d+)\)\s*$/.exec(feat.name);
+            const featKey = keyM ? keyM[1] : null;
+            const keyAttrs = featKey ? `id="feat-card-${featKey}" data-feat-key="${featKey}"` : "";
+
+            // Dependency pills — only Dependent + Blocks link types appear in the data
+            const deps = feat.dependencies || [];
+            const depsHtml = deps.length > 0 ? `
+                <div class="mt-1.5 pt-1.5 border-t border-slate-100/70 dark:border-slate-800/60 flex flex-wrap gap-1">
+                    ${deps.map(dep => {
+                        const isBlock = dep.label === "blocks" || dep.label === "is blocked by";
+                        const isNeeds = dep.label === "depends on" || dep.label === "is blocked by";
+                        const pilCls = isBlock
+                            ? "bg-rose-50 dark:bg-rose-950/30 text-rose-500 dark:text-rose-400"
+                            : isNeeds
+                                ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400";
+                        const shortLabel = isBlock
+                            ? (dep.label === "blocks" ? "blocks" : "blocked by")
+                            : (dep.label === "depends on" ? "needs" : "required by");
+                        return `<span title="${dep.label}: ${dep.key} — ${dep.summary || ''}" class="inline-flex items-center gap-0.5 text-[8px] font-mono font-semibold px-1.5 py-0.5 rounded ${pilCls}">${shortLabel}: ${linkifyJiraKeys(dep.key)}</span>`;
+                    }).join("")}
+                </div>` : "";
+
             return `
-                <div class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all ${cardOpacity}">
+                <div ${keyAttrs} class="p-3 rounded-xl border ${borderClass} bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between min-h-[90px] hover:shadow transition-all ${cardOpacity}">
                     <div class="flex items-start justify-between gap-1.5">
                         <h5 class="font-bold text-slate-800 dark:text-slate-100 text-[11px] leading-tight line-clamp-2">${linkifyJiraKeys(feat.name)}</h5>
                         ${healthBadgeHtml(health)}
@@ -1595,6 +1770,7 @@
                     <div class="mt-2 w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
                         <div class="${statusColorClass} h-1 rounded-full" style="width: ${feat.progress}%;"></div>
                     </div>
+                    ${depsHtml}
                 </div>
             `;
         }
@@ -1683,8 +1859,10 @@
                     return;
                 }
 
-                // Restrict to features in the selected groups (empty selection = no restriction); skip the whole row if nothing matches
-                const visibleFeatures = mf.features.filter(f => activeGroupFilters.size === 0 || activeGroupFilters.has(f.group));
+                // Restrict to features in the selected groups (empty selection = no restriction).
+                // Null-group themes always pass through — they can't be assigned to any group pill,
+                // so hiding them when a group filter is active would silently drop untracked work.
+                const visibleFeatures = mf.features.filter(f => activeGroupFilters.size === 0 || !f.group || activeGroupFilters.has(f.group));
                 if (activeGroupFilters.size > 0 && visibleFeatures.length === 0) {
                     return;
                 }
@@ -1741,6 +1919,156 @@
 
                 elScheduleBody.appendChild(tr);
             });
+
+            // Draw dependency lines after the table is in the DOM
+            renderDependencyLines(masterFeatures);
+        }
+
+        // ─── Dependency-line overlay ───────────────────────────────────────────────
+        // Toggles the SVG overlay that draws arrows between Theme cards in the same
+        // Master-Feature row when those Themes have "Dependent" or "Blocks" links.
+        function toggleDepLines() {
+            showDependencyLines = !showDependencyLines;
+            if (depLineSvg) depLineSvg.style.display = showDependencyLines ? "" : "none";
+            const btn = document.getElementById("dep-lines-toggle-btn");
+            if (!btn) return;
+            if (showDependencyLines) {
+                btn.style.cssText = "background-color:#6366f1;color:#fff;border-color:#6366f1;";
+                btn.innerHTML = `<i data-lucide="git-merge" class="w-3 h-3"></i> Hide Dependencies`;
+            } else {
+                btn.style.cssText = "";
+                btn.innerHTML = `<i data-lucide="git-merge" class="w-3 h-3"></i> Dependencies`;
+            }
+            lucide.createIcons();
+        }
+
+        // Returns {top, left, width, height} of el relative to ancestor, in the
+        // scroll-content coordinate system (not affected by scroll offset).
+        function elemOffsetFrom(el, ancestor) {
+            let top = 0, left = 0;
+            let curr = el;
+            while (curr && curr !== ancestor) {
+                top += curr.offsetTop;
+                left += curr.offsetLeft;
+                curr = curr.offsetParent;
+            }
+            return { top, left, width: el.offsetWidth, height: el.offsetHeight };
+        }
+
+        // Builds (or rebuilds) the SVG overlay that draws curved dependency arrows
+        // between Theme cards within the same Master-Feature row.
+        function renderDependencyLines(masterFeatures) {
+            // Remove any previous overlay
+            if (depLineSvg) { depLineSvg.remove(); depLineSvg = null; }
+
+            const scrollWrap = document.getElementById("schedule-table-scroll");
+            const tableEl    = scrollWrap && scrollWrap.querySelector("table");
+            if (!scrollWrap || !tableEl) return;
+
+            // Map every feature key to its parent MF name
+            const keyToMf = {};
+            masterFeatures.forEach(mf => {
+                mf.features.forEach(f => {
+                    const m = /\(([A-Z]+-\d+)\)\s*$/.exec(f.name);
+                    if (m) keyToMf[m[1]] = mf.name;
+                });
+            });
+
+            // Collect directed pairs: fromKey --[depends on / blocks]--> toKey
+            // Only within the same MF (lines across rows would be cluttered)
+            const pairs = [];
+            masterFeatures.forEach(mf => {
+                mf.features.forEach(f => {
+                    const deps = f.dependencies || [];
+                    if (!deps.length) return;
+                    const sm = /\(([A-Z]+-\d+)\)\s*$/.exec(f.name);
+                    if (!sm) return;
+                    const srcKey = sm[1];
+
+                    deps.forEach(dep => {
+                        if (keyToMf[dep.key] !== mf.name) return; // skip cross-MF
+                        let fromKey, toKey;
+                        // Arrow direction: dependent → prerequisite
+                        if (dep.label === "depends on" || dep.label === "is blocked by") {
+                            fromKey = srcKey; toKey = dep.key;   // src needs dep.key first
+                        } else if (dep.label === "is depended on by" || dep.label === "blocks") {
+                            fromKey = dep.key; toKey = srcKey;   // dep.key needs src first
+                        } else {
+                            fromKey = srcKey; toKey = dep.key;
+                        }
+                        const isBlock = dep.type === "Blocks" || dep.label === "blocks" || dep.label === "is blocked by";
+                        pairs.push({ fromKey, toKey, isBlock });
+                    });
+                });
+            });
+
+            if (pairs.length === 0) return;
+
+            // Build SVG sized to the full table scroll area
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.id = "dep-svg-overlay";
+            svg.style.cssText = "position:absolute;top:0;left:0;pointer-events:none;z-index:10;overflow:visible;";
+            svg.setAttribute("width",  tableEl.scrollWidth);
+            svg.setAttribute("height", tableEl.offsetHeight);
+            svg.style.display = showDependencyLines ? "" : "none";
+
+            // Arrow markers
+            const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+            [["dep-arrow-indigo", "#6366f1"], ["dep-arrow-rose", "#f87171"]].forEach(([id, color]) => {
+                const mk = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+                mk.setAttribute("id", id);
+                mk.setAttribute("viewBox", "0 0 10 10");
+                mk.setAttribute("refX", "9");
+                mk.setAttribute("refY", "5");
+                mk.setAttribute("markerWidth", "6");
+                mk.setAttribute("markerHeight", "6");
+                mk.setAttribute("orient", "auto");
+                const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                p.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+                p.setAttribute("fill", color);
+                mk.appendChild(p);
+                defs.appendChild(mk);
+            });
+            svg.appendChild(defs);
+
+            pairs.forEach(({ fromKey, toKey, isBlock }) => {
+                const fromEl = document.getElementById(`feat-card-${fromKey}`);
+                const toEl   = document.getElementById(`feat-card-${toKey}`);
+                if (!fromEl || !toEl) return;
+
+                const fp = elemOffsetFrom(fromEl, scrollWrap);
+                const tp = elemOffsetFrom(toEl,   scrollWrap);
+
+                const color    = isBlock ? "#f87171" : "#6366f1";
+                const arrowId  = isBlock ? "dep-arrow-rose" : "dep-arrow-indigo";
+
+                // Right-center of source → left-center of target
+                const x1 = fp.left + fp.width;
+                const y1 = fp.top  + fp.height / 2;
+                const x2 = tp.left;
+                const y2 = tp.top  + tp.height / 2;
+
+                const gap = x2 - x1;
+                const ctrl = Math.max(Math.abs(gap) * 0.4, 24);
+                const cx1 = x1 + ctrl;
+                const cy1 = y1;
+                const cx2 = x2 - ctrl;
+                const cy2 = y2;
+
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("d", `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`);
+                path.setAttribute("stroke", color);
+                path.setAttribute("stroke-width", "1.5");
+                path.setAttribute("fill", "none");
+                path.setAttribute("stroke-dasharray", "5 3");
+                path.setAttribute("marker-end", `url(#${arrowId})`);
+                path.setAttribute("opacity", "0.75");
+                svg.appendChild(path);
+            });
+
+            scrollWrap.style.position = "relative";
+            scrollWrap.appendChild(svg);
+            depLineSvg = svg;
         }
 
         // Update the "active filter" banner for the PI Delivery Schedule - shows chips for the row-isolate filter and/or the Group filter
