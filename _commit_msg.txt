@@ -1,7 +1,0 @@
-fix(initiative-status-dashboard): smarter PI-elapsed health for unstarted items
-
-- replace flat "At Risk" for active-PI + Planned with a percentage-based rule:
-  <50% of PI elapsed → no flag (still early)
-  50–70% elapsed → Warning
-  >70% elapsed → At Risk
-- update SKILL.md health rules to document the new thresholds
