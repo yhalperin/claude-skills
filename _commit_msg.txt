@@ -1,8 +1,0 @@
-feat(initiative-status-dashboard): align status colors with Jira palette
-
-- Planned / Open / HL Discovery → teal (green family, not-started)
-- In Progress → blue (was amber/orange)
-- Completed / Done → emerald green (unchanged)
-- Blocked → rose red (unchanged)
-- Cancelled → slate gray (unchanged)
-- add blue + teal support to updateGlobalStatus initiative header badge
