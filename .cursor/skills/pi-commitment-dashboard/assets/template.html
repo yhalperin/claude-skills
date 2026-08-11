@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PI Commitment Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #263042;
+    --border: #334155;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --green: #22c55e;
+    --green-bg: #14532d;
+    --amber: #f59e0b;
+    --amber-bg: #451a03;
+    --red: #ef4444;
+    --red-bg: #450a0a;
+    --blue: #3b82f6;
+    --blue-bg: #1e3a5f;
+    --indigo: #6366f1;
+    --grey: #94a3b8;
+    --grey-bg: #1e293b;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  /* ── Header ── */
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .header-left h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-left p { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .badge-fetch { background: #451a03; color: #fbbf24; border: 1px solid #92400e; border-radius: 20px; padding: 4px 12px; font-size: 11px; font-weight: 600; }
+  .badge-render { color: var(--text-dim); font-size: 11px; }
+  select { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  select:focus { outline: 2px solid var(--indigo); outline-offset: 1px; }
+
+  /* ── Main ── */
+  .main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── KPI row ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .kpi-label { color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi-value { font-size: 32px; font-weight: 700; line-height: 1; }
+  .kpi-sub { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+  .kpi-value.green { color: var(--green); }
+  .kpi-value.amber { color: var(--amber); }
+  .kpi-value.red { color: var(--red); }
+
+  /* ── Section header ── */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-size: 15px; font-weight: 700; }
+  .count-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 12px; color: var(--text-muted); }
+
+  /* ── Division List (summary) ── */
+  .division-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .division-row { display: block; padding: 14px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+  .division-row:last-child { border-bottom: none; }
+  .division-row:hover { background: var(--surface2); }
+  .div-row-main, .div-row-status { display: grid; grid-template-columns: 220px 72px 1fr 110px; align-items: center; gap: 16px; }
+  .div-row-status { margin-top: 6px; }
+  .div-row-main .div-name { font-size: 14px; font-weight: 600; }
+  .div-pct { font-size: 20px; font-weight: 800; text-align: right; white-space: nowrap; }
+  .div-pct.green { color: var(--green); }
+  .div-pct.amber { color: var(--amber); }
+  .div-pct.red { color: var(--red); }
+  .progress-bar { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .progress-fill.green { background: var(--green); }
+  .progress-fill.amber { background: var(--amber); }
+  .progress-fill.red { background: var(--red); }
+  .div-counts { color: var(--text-muted); font-size: 12px; text-align: right; white-space: nowrap; }
+  .div-status-tag { font-size: 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px; }
+  .status-bar { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; display: flex; gap: 1px; }
+  .status-seg { height: 100%; transition: width 0.4s ease; }
+  .status-seg.planned { background: var(--green); border-radius: 4px 0 0 4px; }
+  .status-seg.in-progress { background: var(--blue); }
+  .div-status-counts { color: var(--text-dim); font-size: 11px; text-align: right; white-space: nowrap; display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+  .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.planned { background: var(--green); }
+  .status-dot.in-progress { background: var(--blue); }
+
+  /* ── Drill-down ── */
+  .drilldown { display: none; }
+  .drilldown.active { display: block; }
+  .summary-view.hidden { display: none; }
+
+  .breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; color: var(--text-muted); font-size: 13px; }
+  .breadcrumb a { color: var(--indigo); text-decoration: none; cursor: pointer; }
+  .breadcrumb a:hover { text-decoration: underline; }
+  .breadcrumb-sep { color: var(--text-dim); }
+  .breadcrumb-current { color: var(--text); font-weight: 600; }
+
+  .division-stats-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; display: flex; align-items: center; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+  .ds-label { color: var(--text-muted); font-size: 12px; }
+  .ds-value { font-size: 20px; font-weight: 700; }
+  .ds-pct-badge { border-radius: 20px; padding: 4px 14px; font-size: 14px; font-weight: 700; }
+  .ds-pct-badge.green { background: var(--green-bg); color: var(--green); }
+  .ds-pct-badge.amber { background: var(--amber-bg); color: var(--amber); }
+  .ds-pct-badge.red { background: var(--red-bg); color: var(--red); }
+
+  /* ── Drilldown toolbar ── */
+  .drilldown-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .drilldown-toolbar label { color: var(--text-muted); font-size: 12px; }
+
+  /* ── Group swimlane ── */
+  .group-swimlane { margin-bottom: 24px; }
+  .group-header { display: flex; align-items: center; gap: 10px; padding: 10px 0 8px; border-bottom: 2px solid var(--indigo); margin-bottom: 12px; }
+  .group-name { font-size: 13px; font-weight: 700; color: var(--indigo); text-transform: uppercase; letter-spacing: 0.5px; }
+  .group-count { background: var(--blue-bg); color: var(--blue); border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 600; }
+
+  /* ── Objective picker boxes ── */
+  .obj-picker { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .obj-box { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 14px 18px; cursor: pointer; transition: border-color 0.15s, background 0.15s; min-width: 150px; flex: 1 1 160px; max-width: 260px; user-select: none; }
+  .obj-box:hover { border-color: var(--indigo); background: var(--surface2); }
+  .obj-box.active { border-color: var(--indigo); background: #1e1b4b; }
+  .obj-box.unassigned.active { border-color: var(--border); background: var(--surface2); }
+  .obj-box-name { font-size: 11px; font-weight: 600; line-height: 1.4; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .obj-box-name.all { color: var(--text-dim); }
+  .obj-box-name.unassigned { color: var(--text-dim); font-style: italic; }
+  .obj-box-count { font-size: 26px; font-weight: 800; color: var(--indigo); line-height: 1; }
+  .obj-box.active .obj-box-count { color: #a5b4fc; }
+  .obj-box.unassigned .obj-box-count { color: var(--text-muted); }
+  .obj-box-all-count { font-size: 26px; font-weight: 800; color: var(--text-muted); line-height: 1; }
+
+  /* ── Theme rows ── */
+  .theme-list { }
+  .theme-row { padding: 10px 20px; display: flex; align-items: flex-start; gap: 12px; border-top: 1px solid var(--border); }
+  .theme-row:first-child { border-top: none; }
+  .theme-id { flex-shrink: 0; }
+  .theme-id a { background: var(--blue-bg); color: var(--blue); border: 1px solid #1e40af; border-radius: var(--radius-sm); padding: 2px 8px; font-size: 11px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .theme-id a:hover { background: #1e3a5f; }
+  .theme-body { flex: 1; min-width: 0; }
+  .theme-title { font-size: 13px; font-weight: 600; line-height: 1.4; }
+  .theme-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .finish-chip { border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .finish-chip.green { background: var(--green-bg); color: var(--green); }
+  .finish-chip.amber { background: var(--amber-bg); color: var(--amber); }
+  .finish-chip.red { background: var(--red-bg); color: var(--red); }
+  .finish-chip.grey { background: var(--grey-bg); color: var(--grey); border: 1px solid var(--border); }
+  .obj-pill { background: #1e1b4b; color: #a5b4fc; border: 1px solid #3730a3; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 500; white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Empty state ── */
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+  .empty-state p { font-size: 15px; margin-bottom: 8px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .kpi-row { grid-template-columns: 1fr; }
+    .division-grid { grid-template-columns: 1fr; }
+    .header { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>PI Commitment Dashboard</h1>
+    <p id="header-subtitle">Loading…</p>
+  </div>
+  <div class="header-right">
+    <label for="division-filter" style="color:var(--text-muted);font-size:12px;">Division</label>
+    <select id="division-filter" onchange="applyDivisionFilter(this.value)">
+      <option value="All">All Divisions</option>
+    </select>
+    <span class="badge-fetch" id="fetch-badge"></span>
+    <span class="badge-render" id="render-badge"></span>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Themes</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-sub">across selected scope</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Committed</div>
+      <div class="kpi-value green" id="kpi-committed">—</div>
+      <div class="kpi-sub">commitment level = Committed</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Overall % Committed</div>
+      <div class="kpi-value" id="kpi-pct">—</div>
+      <div class="kpi-sub" id="kpi-pct-sub"></div>
+    </div>
+  </div>
+
+  <!-- Summary View -->
+  <div id="summary-view" class="summary-view">
+    <div class="section-header">
+      <span class="section-title">Division Commitment</span>
+      <span class="count-badge" id="division-count-badge"></span>
+    </div>
+    <div class="division-list" id="division-grid"></div>
+  </div>
+
+  <!-- Drill-Down View -->
+  <div id="drilldown-view" class="drilldown">
+    <div class="breadcrumb">
+      <a onclick="showSummary()">← Summary</a>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-current" id="drilldown-title"></span>
+    </div>
+    <div class="division-stats-bar" id="drilldown-stats"></div>
+    <div class="drilldown-toolbar">
+      <label for="group-filter">Group</label>
+      <select id="group-filter" onchange="applyGroupFilter(this.value)">
+        <option value="All">All Groups</option>
+      </select>
+    </div>
+    <div id="obj-picker-row"></div>
+    <div id="objective-sections"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  // ── Injected data ──
+  const THEMES = __THEMES_JSON__;
+  const DIVISION_TOTALS = __DIVISION_TOTALS_JSON__;
+  const STATUS_THEMES = __STATUS_THEMES_JSON__;
+  const TARGET_PI = __TARGET_PI__;
+  const JIRA_FETCH_TS = __JIRA_FETCH_TS__;
+  const SNAPSHOT_TS = __SNAPSHOT_TS__;
+  const INITIAL_DIVISION = __INITIAL_DIVISION__;
+
+  // ── State ──
+  let currentDivision = "All";
+  let currentDrilldown = null;
+  let currentGroup = "All";
+  let currentObjective = "All";
+
+  // ── Boot ──
+  document.getElementById("fetch-badge").textContent = "Jira Data as of " + JIRA_FETCH_TS;
+  document.getElementById("render-badge").textContent = "Generated " + SNAPSHOT_TS;
+  document.getElementById("header-subtitle").textContent =
+    "Program Increment: " + TARGET_PI + " · Committed Themes by Division";
+
+  // ── Divisions ──
+  function getDivisions(themes) {
+    const s = new Set();
+    themes.forEach(t => (t.divisions || []).forEach(d => s.add(d)));
+    return Array.from(s).sort();
+  }
+
+  const ALL_DIVISIONS = getDivisions(THEMES);
+
+  // Populate dropdown
+  const sel = document.getElementById("division-filter");
+  ALL_DIVISIONS.forEach(d => {
+    const o = document.createElement("option");
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+
+  // ── Helpers ──
+  function pctColor(pct) {
+    if (pct >= 70) return "green";
+    if (pct >= 40) return "amber";
+    return "red";
+  }
+
+  function finishColor(dateStr) {
+    if (!dateStr) return "grey";
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(dateStr); d.setHours(0,0,0,0);
+    const diff = Math.floor((d - today) / 86400000);
+    if (diff >= 30) return "green";
+    if (diff >= 1) return "amber";
+    return "red";
+  }
+
+  function finishLabel(dateStr) {
+    if (!dateStr) return "No date";
+    return "Due " + dateStr;
+  }
+
+  function themesForDivision(themes, division) {
+    if (division === "All") return themes;
+    return themes.filter(t => (t.divisions || []).includes(division));
+  }
+
+  function divisionStats(themes, division) {
+    const divThemes = themesForDivision(themes, division);
+    const committed = divThemes.filter(t => t.committed);
+    // Use real Jira totals when available
+    const realTotal = (division !== "All" && DIVISION_TOTALS && DIVISION_TOTALS[division] != null)
+      ? DIVISION_TOTALS[division]
+      : (division === "All" && DIVISION_TOTALS && DIVISION_TOTALS["__all__"] != null
+          ? DIVISION_TOTALS["__all__"]
+          : divThemes.length);
+    const pct = realTotal === 0 ? 0 : Math.round(committed.length / realTotal * 100);
+    return { total: realTotal, committed: committed.length, pct, themes: divThemes };
+  }
+
+  // ── Status bar helpers ──
+  function statusCountsForDivision(division) {
+    // STATUS_THEMES: array of {id, divisions[], status}
+    // statuses we care about: "Planned" and "In Progress"
+    const divThemes = division === "All"
+      ? STATUS_THEMES
+      : STATUS_THEMES.filter(t => (t.divisions || []).includes(division));
+    const planned = divThemes.filter(t => t.status === "Planned").length;
+    const inProgress = divThemes.filter(t => t.status === "In Progress").length;
+    const total = divThemes.length;
+    return { planned, inProgress, total };
+  }
+
+  // ── KPI update ──
+  function updateKPIs(themes, division) {
+    const stats = divisionStats(themes, division || currentDivision);
+    document.getElementById("kpi-total").textContent = stats.total;
+    document.getElementById("kpi-committed").textContent = stats.committed;
+    const kpiPct = document.getElementById("kpi-pct");
+    kpiPct.textContent = stats.pct + "%";
+    kpiPct.className = "kpi-value " + pctColor(stats.pct);
+    document.getElementById("kpi-pct-sub").textContent =
+      stats.committed + " of " + stats.total + " themes committed";
+  }
+
+  // ── Summary view ──
+  function renderSummary(division) {
+    const scopeThemes = themesForDivision(THEMES, division);
+    updateKPIs(scopeThemes, division);
+
+    const grid = document.getElementById("division-grid");
+    grid.innerHTML = "";
+
+    let divisionsToShow;
+    if (division === "All") {
+      divisionsToShow = ALL_DIVISIONS;
+    } else {
+      divisionsToShow = [division];
+    }
+
+    document.getElementById("division-count-badge").textContent =
+      divisionsToShow.length + " division" + (divisionsToShow.length !== 1 ? "s" : "");
+
+    divisionsToShow.forEach(div => {
+      const stats = divisionStats(THEMES, div);
+      const color = pctColor(stats.pct);
+      const sc = statusCountsForDivision(div);
+      const plannedPct  = sc.total ? Math.round(sc.planned    / sc.total * 100) : 0;
+      const inProgPct   = sc.total ? Math.round(sc.inProgress / sc.total * 100) : 0;
+
+      const row = document.createElement("div");
+      row.className = "division-row";
+      row.innerHTML = `
+        <div class="div-row-main">
+          <div class="div-name">${escHtml(div)}</div>
+          <div class="div-pct ${color}">${stats.pct}%</div>
+          <div class="progress-bar">
+            <div class="progress-fill ${color}" style="width:${stats.pct}%"></div>
+          </div>
+          <div class="div-counts">${stats.committed} committed / ${stats.total} total</div>
+        </div>
+        <div class="div-row-status">
+          <div class="div-status-tag">In-flight</div>
+          <div></div>
+          <div class="status-bar">
+            <div class="status-seg planned"   style="width:${plannedPct}%"></div>
+            <div class="status-seg in-progress" style="width:${inProgPct}%"></div>
+          </div>
+          <div class="div-status-counts">
+            <span class="status-dot planned"></span>${sc.planned} planned
+            &nbsp;
+            <span class="status-dot in-progress"></span>${sc.inProgress} in&nbsp;progress
+          </div>
+        </div>
+      `;
+      row.onclick = () => showDrilldown(div);
+      grid.appendChild(row);
+    });
+  }
+
+  // ── Groups helpers ──
+  function groupsForDivision(themes, division) {
+    const divThemes = themesForDivision(themes, division).filter(t => t.committed);
+    const s = new Set();
+    divThemes.forEach(t => { if (t.group) s.add(t.group); });
+    return Array.from(s).sort();
+  }
+
+  function populateGroupFilter(division) {
+    const sel = document.getElementById("group-filter");
+    // Remove old options beyond "All Groups"
+    while (sel.options.length > 1) sel.remove(1);
+    groupsForDivision(THEMES, division).forEach(g => {
+      const o = document.createElement("option");
+      o.value = g; o.textContent = g;
+      sel.appendChild(o);
+    });
+    sel.value = currentGroup === "All" || !Array.from(sel.options).some(o => o.value === currentGroup)
+      ? "All" : currentGroup;
+    currentGroup = sel.value;
+  }
+
+  // ── Drill-down view ──
+  function renderDrilldown(division) {
+    document.getElementById("drilldown-title").textContent = division;
+
+    const stats = divisionStats(THEMES, division);
+    const color = pctColor(stats.pct);
+    const sc = statusCountsForDivision(division);
+
+    document.getElementById("drilldown-stats").innerHTML = `
+      <div><div class="ds-label">Division</div><div class="ds-value">${escHtml(division)}</div></div>
+      <div><div class="ds-label">Committed</div><div class="ds-value">${stats.committed}</div></div>
+      <div><div class="ds-label">Total</div><div class="ds-value">${stats.total}</div></div>
+      <div><span class="ds-pct-badge ${color}">${stats.pct}% Committed</span></div>
+      <div style="border-left:1px solid var(--border);padding-left:20px;display:flex;gap:16px;">
+        <div><div class="ds-label" style="color:var(--green)">Planned</div><div class="ds-value" style="color:var(--green);font-size:16px">${sc.planned}</div></div>
+        <div><div class="ds-label" style="color:var(--blue)">In Progress</div><div class="ds-value" style="color:var(--blue);font-size:16px">${sc.inProgress}</div></div>
+      </div>
+    `;
+
+    populateGroupFilter(division);
+
+    // Committed themes for this division, optionally filtered by group
+    let committedThemes = stats.themes.filter(t => t.committed);
+    if (currentGroup !== "All") {
+      committedThemes = committedThemes.filter(t => t.group === currentGroup);
+    }
+
+    // ── Build objective index (across all themes, ignoring currentObjective) ──
+    const byObj = {};
+    committedThemes.forEach(t => {
+      const ok = t.objectiveName || "__unassigned__";
+      if (!byObj[ok]) byObj[ok] = [];
+      byObj[ok].push(t);
+    });
+    const namedObjKeys = Object.keys(byObj).filter(k => k !== "__unassigned__").sort();
+    const allObjKeys = byObj["__unassigned__"]
+      ? namedObjKeys.concat(["__unassigned__"])
+      : namedObjKeys;
+
+    // ── Render objective picker boxes ──
+    const pickerRow = document.getElementById("obj-picker-row");
+    pickerRow.innerHTML = "";
+
+    if (committedThemes.length > 0) {
+      const picker = document.createElement("div");
+      picker.className = "obj-picker";
+
+      // "All" box
+      const allBox = document.createElement("div");
+      allBox.className = "obj-box" + (currentObjective === "All" ? " active" : "");
+      allBox.innerHTML = `<div class="obj-box-name all">All Objectives</div><div class="obj-box-all-count">${committedThemes.length}</div>`;
+      allBox.onclick = () => { currentObjective = "All"; renderDrilldown(division); };
+      picker.appendChild(allBox);
+
+      allObjKeys.forEach(ok => {
+        const isUnassigned = ok === "__unassigned__";
+        const label = isUnassigned ? "Unassigned" : ok;
+        const count = byObj[ok].length;
+        const isActive = currentObjective === ok;
+        const box = document.createElement("div");
+        box.className = "obj-box" + (isUnassigned ? " unassigned" : "") + (isActive ? " active" : "");
+        box.innerHTML = `
+          <div class="obj-box-name ${isUnassigned ? 'unassigned' : ''}">${escHtml(label)}</div>
+          <div class="obj-box-count">${count}</div>
+        `;
+        box.onclick = () => { currentObjective = ok; renderDrilldown(division); };
+        picker.appendChild(box);
+      });
+
+      pickerRow.appendChild(picker);
+    }
+
+    // ── Render theme list ──
+    const container = document.getElementById("objective-sections");
+    container.innerHTML = "";
+
+    if (committedThemes.length === 0) {
+      container.innerHTML = `<div class="empty-state"><p>No committed themes for this selection.</p></div>`;
+      return;
+    }
+
+    // Filter by selected objective
+    const visibleThemes = currentObjective === "All"
+      ? committedThemes
+      : committedThemes.filter(t => (t.objectiveName || "__unassigned__") === currentObjective);
+
+    if (visibleThemes.length === 0) {
+      container.innerHTML = `<div class="empty-state"><p>No themes for this objective.</p></div>`;
+      return;
+    }
+
+    // Group by swimlane (group field), then render flat theme list inside each
+    const useSwimlanes = currentGroup === "All";
+    const byGroup = {};
+    visibleThemes.forEach(t => {
+      const gk = t.group || "__nogroup__";
+      if (!byGroup[gk]) byGroup[gk] = [];
+      byGroup[gk].push(t);
+    });
+    const groupKeys = useSwimlanes
+      ? Object.keys(byGroup).filter(k => k !== "__nogroup__").sort().concat(byGroup["__nogroup__"] ? ["__nogroup__"] : [])
+      : ["__all__"];
+    if (!useSwimlanes) byGroup["__all__"] = visibleThemes;
+
+    // Outer section card
+    const section = document.createElement("div");
+    section.className = "objective-section";
+
+    groupKeys.forEach(gk => {
+      const groupThemes = byGroup[gk];
+      if (!groupThemes || groupThemes.length === 0) return;
+
+      if (useSwimlanes) {
+        const gh = document.createElement("div");
+        gh.className = "group-header";
+        const gLabel = gk === "__nogroup__" ? "No Group" : gk;
+        gh.innerHTML = `
+          <span class="group-name">${escHtml(gLabel)}</span>
+          <span class="group-count">${groupThemes.length} theme${groupThemes.length !== 1 ? 's' : ''}</span>
+        `;
+        section.appendChild(gh);
+      }
+
+      const list = document.createElement("div");
+      list.className = "theme-list";
+      groupThemes.forEach(t => {
+        const fColor = finishColor(t.finishDate);
+        const fLabel = finishLabel(t.finishDate);
+        const row = document.createElement("div");
+        row.className = "theme-row";
+        // Show objective pill only when viewing all objectives
+        const objHtml = (currentObjective === "All" && t.objectiveName)
+          ? `<span class="obj-pill" title="${escHtml(t.objectiveName)}">${escHtml(t.objectiveName)}</span>`
+          : "";
+        row.innerHTML = `
+          <div class="theme-id"><a href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.id)}</a></div>
+          <div class="theme-body">
+            <div class="theme-title">${escHtml(t.title)}</div>
+            <div class="theme-meta">
+              <span class="finish-chip ${fColor}">${escHtml(fLabel)}</span>
+              ${objHtml}
+            </div>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+      section.appendChild(list);
+    });
+
+    container.appendChild(section);
+  }
+
+  // ── Navigation ──
+  function showSummary() {
+    currentDrilldown = null;
+    currentGroup = "All";
+    currentObjective = "All";
+    document.getElementById("summary-view").classList.remove("hidden");
+    document.getElementById("drilldown-view").classList.remove("active");
+    renderSummary(currentDivision);
+  }
+
+  function showDrilldown(division) {
+    currentGroup = "All";
+    currentObjective = "All";
+    currentDrilldown = division;
+    document.getElementById("summary-view").classList.add("hidden");
+    document.getElementById("drilldown-view").classList.add("active");
+    renderDrilldown(division);
+    updateKPIs(themesForDivision(THEMES, division), division);
+  }
+
+  window.showSummary = showSummary;
+  window.showDrilldown = showDrilldown;
+
+  window.applyGroupFilter = function(group) {
+    currentGroup = group;
+    currentObjective = "All";
+    if (currentDrilldown) renderDrilldown(currentDrilldown);
+  };
+
+  window.applyDivisionFilter = function(division) {
+    currentDivision = division;
+    sel.value = division;
+    if (currentDrilldown) {
+      // If in drill-down and current division changes, go back to summary
+      showSummary();
+    } else {
+      renderSummary(division);
+    }
+  };
+
+  // ── Escape HTML ──
+  function escHtml(s) {
+    if (s == null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // ── Initial render ──
+  if (INITIAL_DIVISION && INITIAL_DIVISION !== "All") {
+    currentDivision = INITIAL_DIVISION;
+    sel.value = INITIAL_DIVISION;
+    showDrilldown(INITIAL_DIVISION);
+  } else {
+    renderSummary("All");
+  }
+})();
+</script>
+</body>
+</html>
