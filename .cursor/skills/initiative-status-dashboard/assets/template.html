@@ -1221,6 +1221,12 @@
             if (color === "emerald") {
                 badgeClass += "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60";
                 pulseDotColor = "bg-emerald-500";
+            } else if (color === "blue") {
+                badgeClass += "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/60";
+                pulseDotColor = "bg-blue-500";
+            } else if (color === "teal") {
+                badgeClass += "bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800/60";
+                pulseDotColor = "bg-teal-500";
             } else if (color === "amber") {
                 badgeClass += "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/60";
                 pulseDotColor = "bg-amber-500";
@@ -1314,16 +1320,20 @@
         // Shared status pill classes (Master-Feature milestone cards use these; Feature cards have their own richer variant)
         function statusPillClasses(status) {
             if (status === "Completed") return "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800";
-            if (status === "In Progress") return "bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900";
+            if (status === "In Progress") return "bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900";
             if (status === "Blocked") return "bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900";
-            return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700";
+            if (isCancelled(status)) return "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500 border border-slate-200 dark:border-slate-700";
+            // Planned / Open / HL Discovery / any other not-started → teal (green family, lighter than Done)
+            return "bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800";
         }
 
         function progressRingColorClass(status) {
             if (status === "Completed") return "text-emerald-500";
-            if (status === "In Progress") return "text-amber-500";
+            if (status === "In Progress") return "text-blue-500";
             if (status === "Blocked") return "text-rose-500";
-            return "text-slate-300 dark:text-slate-600";
+            if (isCancelled(status)) return "text-slate-300 dark:text-slate-600";
+            // Planned / Open / HL Discovery
+            return "text-teal-400";
         }
 
         function healthAccentClass(level) {
@@ -1786,15 +1796,20 @@
                 textStatus = "Completed";
                 statusBadgeStyle = "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400";
             } else if (feat.status === "In Progress") {
-                statusColorClass = "bg-amber-500";
-                borderClass = "border-amber-100 dark:border-amber-950";
+                statusColorClass = "bg-blue-500";
+                borderClass = "border-blue-100 dark:border-blue-950";
                 textStatus = "In Progress";
-                statusBadgeStyle = "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400";
+                statusBadgeStyle = "bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400";
             } else if (feat.status === "Blocked") {
                 statusColorClass = "bg-rose-500";
                 borderClass = "border-rose-200 dark:border-rose-950/60";
                 textStatus = "Blocked";
                 statusBadgeStyle = "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900";
+            } else {
+                // Planned / Open / HL Discovery / any other not-started status → teal (green family)
+                statusColorClass = "bg-teal-400";
+                borderClass = "border-teal-100 dark:border-teal-900/50";
+                statusBadgeStyle = "bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400";
             }
             // Display the raw Jira status label when available; fall back to the mapped category for legacy data
             const displayStatus = feat.jiraStatus || textStatus;
