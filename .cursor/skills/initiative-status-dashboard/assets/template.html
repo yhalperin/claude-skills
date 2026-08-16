@@ -86,42 +86,10 @@
                         </div>
                     </div>
 
-                    <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
-
-                    <!-- Initiative Selector: options populated dynamically from INITIATIVE_DATA on load -->
-                    <div class="relative">
-                        <select id="initiative-selector" onchange="changeInitiative(this.value)" class="appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm rounded-lg pl-3 pr-8 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer max-w-[220px] sm:max-w-none truncate">
-                        </select>
-                        <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-                    </div>
-
-                    <!-- Initiative Overall Health Badge -->
-                    <span id="global-status-badge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 relative flex pulse-dot"></span>
-                        On Track
-                    </span>
-
-                    <!-- Back to the multi-initiative Overview - only ever shown when 2+ initiatives are loaded and
-                         we're currently drilled into one of them; hidden entirely in single-initiative dashboards. -->
-                    <button id="back-to-overview-btn" onclick="showOverview()" class="hidden items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-300 transition-all duration-200">
-                        <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
-                        <span class="hidden sm:inline">All Initiatives</span>
-                    </button>
-                </div>
-
-                <!-- Right Header Tools -->
-                <div class="flex items-center gap-2 sm:gap-3">
-                    <!-- Jira Sync Trigger -->
-                    <button onclick="triggerJiraSync()" class="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-300 transition-all duration-200" id="sync-button">
-                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="sync-icon"></i>
-                        <span class="hidden sm:inline">Pull JIRA Schema</span>
-                    </button>
-
-                    <!-- CSV Import Panel Toggle -->
-                    <button onclick="toggleCSVEditor()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-300 transition-all">
-                        <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
-                        <span class="hidden md:inline">Jira CSV Schema</span>
-                    </button>
+                    <select id="initiative-selector"
+                        onchange="openInitiativeDetail(this.value)"
+                        class="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-slate-700 dark:text-slate-300 font-medium focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none cursor-pointer hidden">
+                    </select>
 
                     <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
 
@@ -147,10 +115,7 @@
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
                     </span>
-                    <span>Active Workspace Synchronized. Milestones resolved from **Target Finish Dates** in Jira. Last updated: <strong id="last-sync-timestamp">just now</strong></span>
-                </div>
-                <div class="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 font-semibold cursor-pointer hover:underline" onclick="toggleCSVEditor()">
-                    <i data-lucide="settings" class="w-3.5 h-3.5"></i> Configure CSV Fields
+                    <span>Jira data last fetched: <strong id="last-sync-timestamp">–</strong></span>
                 </div>
             </div>
 
@@ -248,6 +213,10 @@
                         <i data-lucide="layout" class="w-4 h-4"></i>
                         Executive Summary
                     </button>
+                    <button id="tab-gantt-btn" onclick="switchTab('gantt')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+                        <i data-lucide="gantt-chart" class="w-4 h-4"></i>
+                        Gantt
+                    </button>
                     <button id="tab-schedule-btn" onclick="switchTab('schedule')" class="flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                         <i data-lucide="calendar-range" class="w-4 h-4"></i>
                         PI Delivery Schedule
@@ -258,90 +227,84 @@
                     </button>
                 </div>
 
-                <!-- Time Horizon Indicator -->
-                <div class="flex items-center gap-2 text-xs">
-                    <span class="text-slate-400">Planning Scope:</span>
-                    <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700" id="initiative-scope-badge">TBD</span>
-                    <span class="text-slate-400">Planned Horizon:</span>
-                    <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700" id="initiative-horizon-badge">TBD</span>
-                </div>
             </div>
 
             <div id="tab-snapshot" class="space-y-6">
 
                 <!-- Bento Box KPI Metrics Row -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="grid grid-cols-4 gap-4">
 
-                    <!-- KPI 1: Overall Completion (Features based) -->
-                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
+                    <!-- KPI 1: Feature Status Distribution -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
                         <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-brand-500/10 rounded-full blur-xl transition-all duration-300"></div>
                         <div class="flex items-start justify-between">
                             <div>
                                 <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Initiative Progress</span>
-                                <h3 class="text-3xl font-bold mt-1 text-slate-900 dark:text-white" id="stat-progress-txt">0%</h3>
+                                <h3 class="text-2xl font-bold mt-1 text-slate-900 dark:text-white" id="stat-progress-txt">0%</h3>
                             </div>
                             <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/50 flex items-center justify-center text-brand-600 dark:text-brand-400">
-                                <i data-lucide="activity" class="w-5 h-5"></i>
+                                <i data-lucide="pie-chart" class="w-5 h-5"></i>
                             </div>
                         </div>
+                        <div class="mt-3 flex items-center gap-3">
+                            <svg id="stat-pie-chart" width="52" height="52" viewBox="0 0 36 36" class="flex-shrink-0" style="transform:rotate(-90deg)">
+                                <!-- Segments filled by JS -->
+                            </svg>
+                            <div id="stat-pie-legend" class="flex flex-col gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                <!-- Dynamic legend filled by JS -->
+                            </div>
+                        </div>
+                    </div>
 
-                        <div class="mt-5 space-y-2">
-                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                                <div id="stat-progress-bar" class="bg-brand-500 h-2 rounded-full transition-all duration-500" style="width: 0%;"></div>
+                    <!-- KPI 2: Planning Index -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl transition-all duration-300"></div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Planning Index</span>
+                                <h3 class="text-2xl font-bold mt-1 text-slate-900 dark:text-white" id="stat-planning-index">—</h3>
                             </div>
-                            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                                <span id="features-ratio-text">0 / 0 Features Delivered</span>
-                                <span class="font-medium text-emerald-600 dark:text-emerald-400">Features Rollup</span>
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                <i data-lucide="calendar-check-2" class="w-5 h-5"></i>
                             </div>
+                        </div>
+                        <div class="mt-3 space-y-1.5 text-[10px] text-slate-500 dark:text-slate-400" id="stat-planning-breakdown">
+                            <!-- Filled by JS -->
                         </div>
                     </div>
 
                     <!-- KPI 2: Timeline Target -->
-                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
                         <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl transition-all duration-300"></div>
                         <div class="flex items-start justify-between">
                             <div>
-                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Planned Timeline</span>
-                                <h3 class="text-xl font-bold mt-2 text-indigo-600 dark:text-indigo-400 truncate" id="stat-timeline-range">N/A</h3>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Delivery Target</span>
+                                <h3 class="text-lg font-bold mt-1 text-indigo-600 dark:text-indigo-400 truncate" id="stat-timeline-range">N/A</h3>
                             </div>
-                            <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                <i data-lucide="calendar" class="w-5 h-5"></i>
-                            </div>
+                            <span id="stat-timeline-variance" class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex-shrink-0">On Schedule</span>
                         </div>
 
                         <div class="mt-5 space-y-1">
                             <div class="flex justify-between items-center text-xs text-slate-500">
-                                <span>Timeline Target:</span>
+                                <span>Last feature delivery:</span>
                                 <span class="font-semibold text-slate-800 dark:text-slate-200" id="stat-timeline-target">N/A</span>
-                            </div>
-                            <div class="flex justify-between items-center text-xs text-slate-500">
-                                <span>Status Sync:</span>
-                                <span class="font-semibold text-emerald-600 dark:text-emerald-400" id="stat-timeline-variance">On Schedule</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- KPI 3: Group Workload Breakdown -->
-                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
-                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl transition-all duration-300"></div>
+                    <!-- KPI 3: Initiative Details -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-violet-500/10 rounded-full blur-xl transition-all duration-300"></div>
                         <div class="flex items-start justify-between">
                             <div>
-                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Group Distribution</span>
-                                <h3 class="text-3xl font-bold mt-1 text-emerald-600 dark:text-emerald-400" id="stat-active-groups">0 Groups</h3>
+                                <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Initiative Details</span>
                             </div>
-                            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                                <i data-lucide="users" class="w-5 h-5"></i>
+                            <div class="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center text-violet-600 dark:text-violet-400">
+                                <i data-lucide="info" class="w-5 h-5"></i>
                             </div>
                         </div>
-
-                        <!-- Simple visual distribution indicator -->
-                        <div class="mt-5 space-y-2">
-                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden flex" id="stat-distribution-bar">
-                                <!-- Dynamic block segments filled by JS -->
-                            </div>
-                            <div class="flex items-center flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400" id="stat-distribution-legend">
-                                <!-- Dynamic group legend filled by JS -->
-                            </div>
+                        <div class="mt-3 space-y-2" id="stat-initiative-details">
+                            <!-- Filled by JS -->
                         </div>
                     </div>
 
@@ -388,21 +351,31 @@
                     </div>
                 </div>
 
-                <!-- Master-Features (Milestones) Panel - full width (Initiative Risks panel has been removed) -->
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Master-Features (Milestones)</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Core milestone delivery rollup with corresponding execution health</p>
-                        </div>
-                        <div class="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500 font-mono flex-shrink-0">
-                            1 Master-Feature = 1 Major Milestone
-                        </div>
-                    </div>
 
-                    <!-- Milestone Swimlanes - one lane per Planned-PI target, chronologically sorted -->
-                    <div id="milestones-grid" class="space-y-6">
-                        <!-- Populated dynamically -->
+            </div>
+
+            <div id="tab-gantt" class="hidden space-y-4">
+
+                <!-- Filter bar -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm space-y-3">
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Master-Feature Gantt</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Quarter-scale Gantt derived from feature delivery dates. Master-Feature row spans all its features. Features are colored by assigned group.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex-shrink-0">Filter by Group:</span>
+                        <div id="gantt-group-filter" class="flex flex-wrap gap-1.5 flex-1"></div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex-shrink-0">Master-Feature:</span>
+                        <div id="gantt-mf-filter" class="flex flex-wrap gap-1.5 flex-1"></div>
+                    </div>
+                </div>
+
+                <!-- Chart container -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-x-auto">
+                    <div id="gantt-chart" class="min-w-[600px]">
+                        <!-- Populated dynamically by renderGanttChart() -->
                     </div>
                 </div>
 
@@ -479,7 +452,7 @@
                         <i data-lucide="list-checks" class="w-4 h-4 text-brand-500"></i>
                         Insights Detail
                     </h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Full item-level breakdown of every finding summarized on the Executive Summary tab, grouped by finding - e.g. every item still open under the same at-risk Planned PI is listed together.</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Feature-level findings swimlaned by Master Feature. Each row shows the affected feature, its Jira key, the issue detected, and a suggested next action.</p>
                 </div>
 
                 <!-- Insight group sections -->
@@ -493,47 +466,6 @@
             <!-- /view-detail -->
 
         </main>
-
-        <!-- Slide-Over/Modal: CSV Data Schema Studio -->
-        <div id="csv-drawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between overflow-hidden">
-            <div class="p-6 overflow-y-auto space-y-6 flex-grow">
-                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-900 dark:text-white">JIRA CSV Export Schema</h2>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Map fields exported directly from JIRA filter tables</p>
-                    </div>
-                    <button onclick="toggleCSVEditor()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all">
-                        <i data-lucide="x" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <div class="space-y-2">
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">JIRA Standard CSV Headers Mapping</label>
-                    <p class="text-xs text-slate-400 mb-2">Configure how master-features and features are structured from JIRA fields:</p>
-                    <textarea id="csv-raw-textarea" rows="11" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 p-3 rounded-xl font-mono text-[10px] text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-brand-500 focus:outline-none"></textarea>
-                </div>
-
-                <!-- Simulation Guidance Info -->
-                <div class="bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs space-y-2 text-slate-600 dark:text-slate-300">
-                    <span class="font-bold text-slate-700 dark:text-slate-200 block">💡 Field Sync Instructions:</span>
-                    <ul class="list-disc pl-4 space-y-1 text-slate-500">
-                        <li><strong class="text-slate-700 dark:text-slate-300">Master-Feature:</strong> Map to JIRA <code class="p-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[10px]">Epic Link</code> or Parent.</li>
-                        <li><strong class="text-slate-700 dark:text-slate-300">Feature:</strong> Standard JIRA <code class="p-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[10px]">Summary</code> of nested tasks.</li>
-                        <li><strong class="text-slate-700 dark:text-slate-300">Group/Division:</strong> Map to JIRA <code class="p-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[10px]">Component</code> or Custom Team fields.</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Drawer Footer -->
-            <div class="p-4 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex gap-3">
-                <button onclick="saveAndApplyCSV()" class="flex-grow py-2 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all">
-                    Apply Schema
-                </button>
-                <button onclick="toggleCSVEditor()" class="py-2 px-4 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all">
-                    Cancel
-                </button>
-            </div>
-        </div>
 
         <!-- Global Toast Alert Container -->
         <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
@@ -586,7 +518,9 @@
         const elViewDetail = document.getElementById("view-detail");
         const elOverviewGrid = document.getElementById("overview-grid");
         const elStatProgressTxt = document.getElementById("stat-progress-txt");
-        const elStatProgressBar = document.getElementById("stat-progress-bar");
+        const elStatProgressBar   = document.getElementById("stat-progress-bar");
+        const elStatPlanningIndex     = document.getElementById("stat-planning-index");
+        const elStatPlanningBreakdown = document.getElementById("stat-planning-breakdown");
         const elFeaturesRatioText = document.getElementById("features-ratio-text");
         const elStatTimelineRange = document.getElementById("stat-timeline-range");
         const elStatTimelineTarget = document.getElementById("stat-timeline-target");
@@ -594,8 +528,6 @@
         const elMilestonesContainer = document.getElementById("milestones-grid");
         const elScheduleBody = document.getElementById("schedule-body");
         const elScheduleGroupFilterContainer = document.getElementById("schedule-group-filter-container");
-        const elCsvDrawer = document.getElementById("csv-drawer");
-        const elCsvRawTextarea = document.getElementById("csv-raw-textarea");
         const elScheduleFilterBannerContainer = document.getElementById("schedule-filter-banner-container");
         const elInsightsListContainer = document.getElementById("insights-list-container");
         const elInsightsCountBadge = document.getElementById("insights-count-badge");
@@ -603,8 +535,16 @@
 
         window.onload = function() {
             lucide.createIcons();
+            if (PAYLOAD.generatedAt) {
+                try {
+                    const d = new Date(PAYLOAD.generatedAt);
+                    const opts = { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+                    document.getElementById("last-sync-timestamp").innerText = d.toLocaleString('en-GB', opts);
+                } catch(e) {
+                    document.getElementById("last-sync-timestamp").innerText = PAYLOAD.generatedAt;
+                }
+            }
             populateInitiativeSelector();
-            elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
             if (MULTI_INITIATIVE) {
                 renderOverview();
                 showOverview();
@@ -635,8 +575,7 @@
             currentInitiativeKey = key;
             activeMasterFeatureFilter = null; // Clear active row isolate on initiative hop
             activeGroupFilters.clear(); // Clear active Group filter on initiative hop
-            elInitiativeSelector.value = key;
-            elCsvRawTextarea.value = buildCsvFromCurrentInitiative();
+            if (elInitiativeSelector) elInitiativeSelector.value = key;
             if (MULTI_INITIATIVE) {
                 elViewOverview.classList.add("hidden");
                 elBackToOverviewBtn.classList.remove("hidden");
@@ -737,10 +676,15 @@
 
         // Build the initiative dropdown from whatever keys are present in INITIATIVE_DATA - supports 1..N initiatives
         function populateInitiativeSelector() {
+            if (!elInitiativeSelector) return;
             elInitiativeSelector.innerHTML = Object.keys(INITIATIVE_DATA).map(key =>
                 `<option value="${key}">${INITIATIVE_DATA[key].title}</option>`
             ).join("");
             elInitiativeSelector.value = currentInitiativeKey;
+            // Show selector only when multiple initiatives are loaded
+            if (Object.keys(INITIATIVE_DATA).length > 1) {
+                elInitiativeSelector.classList.remove("hidden");
+            }
         }
 
         // Theme Manager
@@ -1089,8 +1033,10 @@
             closeHealthPopover();
 
             // Update top bar text & metadata metrics
-            document.getElementById("initiative-scope-badge").innerText = data.scope;
-            document.getElementById("initiative-horizon-badge").innerText = data.horizon;
+            const _scopeBadge = document.getElementById("initiative-scope-badge");
+            if (_scopeBadge) _scopeBadge.innerText = data.scope;
+            const _horizonBadge = document.getElementById("initiative-horizon-badge");
+            if (_horizonBadge) _horizonBadge.innerText = data.horizon;
 
             // Health statuses - reconciled against the live Off Track check so the header badge can never say
             // "On Track" while the timeline itself is provably off track (see computeEffectiveInitiativeStatus()).
@@ -1101,12 +1047,36 @@
             const featuresStats = getFeaturesCompletionMetrics(data.masterFeatures);
             const total = featuresStats.total;
             const completed = featuresStats.completed;
-            const overallPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+            // Initiative Progress (weighted): Done=100%, In Progress=50%, others=0%
+            // renderStatusPieChart will overwrite this with the same value via weighted formula
+            const overallPercentage = (() => {
+                let s = 0, t = 0;
+                data.masterFeatures.forEach(mf => {
+                    if (isCancelled(mf.status)) return;
+                    (mf.features || []).forEach(f => {
+                        if (isCancelled(f.status)) return;
+                        t++;
+                        if (f.status === 'Completed') s += 100;
+                        else if (f.status === 'In Progress') s += 50;
+                    });
+                });
+                return t > 0 ? Math.round(s / t) : 0;
+            })();
 
-            // Fill top row card statistics
+            // Fill top row card statistics (pie chart will also overwrite stat-progress-txt)
             elStatProgressTxt.innerText = `${overallPercentage}%`;
-            elStatProgressBar.style.width = `${overallPercentage}%`;
-            elFeaturesRatioText.innerText = `${completed} / ${total} Features Delivered`;
+
+            // Planning Index card
+            const planIdx = computePlanningIndex(data.masterFeatures);
+            if (elStatPlanningIndex) elStatPlanningIndex.innerText = planIdx.index + '%';
+            if (elStatPlanningBreakdown) {
+                const dot = (color) => `<span class="inline-block w-2 h-2 rounded-full flex-shrink-0" style="background:${color}"></span>`;
+                elStatPlanningBreakdown.innerHTML = [
+                    planIdx.future  > 0 ? `<div class="flex items-center gap-1.5">${dot('#10b981')} ${planIdx.future} feature${planIdx.future===1?'':'s'} with future finish date</div>` : '',
+                    planIdx.past    > 0 ? `<div class="flex items-center gap-1.5">${dot('#f59e0b')} ${planIdx.past} feature${planIdx.past===1?'':'s'} with past finish date (50%)</div>` : '',
+                    planIdx.noDate  > 0 ? `<div class="flex items-center gap-1.5">${dot('#94a3b8')} ${planIdx.noDate} feature${planIdx.noDate===1?'':'s'} with no finish date (0%)</div>` : '',
+                ].filter(Boolean).join('');
+            }
 
             elStatTimelineRange.innerText = data.timelineRange;
             elStatTimelineTarget.innerText = data.stats.timelineTarget;
@@ -1124,17 +1094,18 @@
             // fall back to the authored free-text variance's own rose/emerald read.
             if (timelineMismatch) {
                 const sev = offTrackSeverityColor(timelineMismatch.daysLate);
-                elStatTimelineVariance.className = sev === "rose" ? "font-semibold text-rose-500 dark:text-rose-400" : "font-semibold text-amber-500 dark:text-amber-400";
+                elStatTimelineVariance.className = sev === "rose" ? "text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex-shrink-0" : "text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 flex-shrink-0";
             } else if (effectiveVariance.includes("Risk") || effectiveVariance.includes("Delayed") || effectiveVariance.includes("Stalling")) {
-                elStatTimelineVariance.className = "font-semibold text-rose-500 dark:text-rose-400";
+                elStatTimelineVariance.className = "text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex-shrink-0";
             } else {
-                elStatTimelineVariance.className = "font-semibold text-emerald-600 dark:text-emerald-400";
+                elStatTimelineVariance.className = "text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex-shrink-0";
             }
 
             // Render Dynamic components
             renderInitiativeOverviewPanel(data);
-            renderGroupWorkloadDistribution(data.masterFeatures);
-            renderMilestonesGrid(data.masterFeatures);
+            renderStatusPieChart(data.masterFeatures);
+            renderInitiativeDetails(data);
+            renderGanttChart(data);
             renderGroupFilterPills(data.masterFeatures);
             renderScheduleMatrix(data.masterFeatures);
             updateFilterBanners();
@@ -1182,8 +1153,8 @@
                 readinessList.innerHTML = items.map(item => {
                     const doc = data.readiness[item.key];
                     const ok = doc && doc.status === 'ok';
-                    const dotCls = ok ? 'bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600';
-                    const textCls = ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500';
+                    const dotCls = ok ? 'bg-emerald-400' : 'bg-amber-400 dark:bg-amber-500';
+                    const textCls = ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-500';
                     const linkHtml = ok && doc.link
                         ? `<a href="${doc.link}" target="_blank" class="ml-1 text-brand-500 hover:underline text-[10px]">↗</a>`
                         : '';
@@ -1235,11 +1206,13 @@
                 pulseDotColor = "bg-rose-500";
             }
 
-            elGlobalStatusBadge.className = badgeClass;
-            elGlobalStatusBadge.innerHTML = `
-                <span class="w-2 h-2 rounded-full ${pulseDotColor} relative flex pulse-dot"></span>
-                ${status}
-            `;
+            if (elGlobalStatusBadge) {
+                elGlobalStatusBadge.className = badgeClass;
+                elGlobalStatusBadge.innerHTML = `
+                    <span class="w-2 h-2 rounded-full ${pulseDotColor} relative flex pulse-dot"></span>
+                    ${status}
+                `;
+            }
         }
 
         // Assigns a consistent color to each distinct group name from a repeating palette (groups are arbitrary Jira "Group" field values, not fixed buckets)
@@ -1274,47 +1247,424 @@
 
         // Calculate workload density per execution group (derived live from each active Theme's "Group" field) and render horizontal stacked bar.
         // Cancelled/Archived features are excluded from the distribution so they don't skew group workload.
-        function renderGroupWorkloadDistribution(masterFeatures) {
-            const groupNames = getDistinctGroups(masterFeatures);
-            const counts = {};
-            let total = 0;
-
+        // Planning Index: % of features with a valid future FinishDate
+        // Future FinishDate = 100 pts, past FinishDate = 50 pts, no FinishDate = 0 pts
+        function computePlanningIndex(masterFeatures) {
+            const today = new Date();
+            let total = 0, score = 0, future = 0, past = 0, noDate = 0;
             masterFeatures.forEach(mf => {
                 if (isCancelled(mf.status)) return;
-                mf.features.forEach(f => {
+                (mf.features || []).forEach(f => {
                     if (isCancelled(f.status)) return;
-                    if (!f.group) return; // null-group themes excluded from distribution
-                    counts[f.group] = (counts[f.group] || 0) + 1;
                     total++;
+                    if (!f.finishDate) {
+                        noDate++;
+                    } else if (new Date(f.finishDate).getTime() >= today.getTime()) {
+                        future++; score += 100;
+                    } else {
+                        past++; score += 50;
+                    }
+                });
+            });
+            return { index: total > 0 ? Math.round(score / total) : 0, total, future, past, noDate };
+        }
+
+        function renderStatusPieChart(masterFeatures) {
+            const COLORS = { 'Completed': '#10b981', 'In Progress': '#3b82f6', 'Planned': '#94a3b8', 'Blocked': '#ef4444' };
+            const counts = { 'Completed': 0, 'In Progress': 0, 'Planned': 0, 'Blocked': 0 };
+            let total = 0;
+            masterFeatures.forEach(mf => {
+                (mf.features || []).forEach(f => {
+                    if (isCancelled(f.status)) return;
+                    total++;
+                    if (counts.hasOwnProperty(f.status)) counts[f.status]++;
+                    else counts['Planned']++;
                 });
             });
 
-            document.getElementById("stat-active-groups").innerText = `${groupNames.length} Group${groupNames.length === 1 ? '' : 's'}`;
+            // Initiative Progress: Done=100%, In Progress=50%, others=0%
+            const weightedScore = counts['Completed'] * 100 + counts['In Progress'] * 50;
+            const pct = total > 0 ? Math.round(weightedScore / total) : 0;
+            const progEl = document.getElementById('stat-progress-txt');
+            if (progEl) progEl.innerText = pct + '%';
 
-            const bar = document.getElementById("stat-distribution-bar");
-            bar.innerHTML = "";
-
-            if (total === 0) {
-                bar.innerHTML = `<div class="bg-slate-300 w-full h-full"></div>`;
-            } else {
-                groupNames.forEach(group => {
-                    const count = counts[group];
-                    const pct = (count / total) * 100;
-                    const color = groupColor(group, groupNames);
-                    const segment = document.createElement("div");
-                    segment.className = `${color.bar} h-full transition-all duration-300`;
-                    segment.style.width = `${pct}%`;
-                    segment.title = `${group}: ${count} Features (${Math.round(pct)}%)`;
-                    bar.appendChild(segment);
+            const R = 15.915, CX = 18, CY = 18, C = 2 * Math.PI * R;
+            let segments = '';
+            let cum = 0;
+            if (total > 0) {
+                Object.entries(counts).forEach(([status, count]) => {
+                    if (!count) return;
+                    const frac = count / total;
+                    const dash = frac * C;
+                    const offset = C - cum;
+                    segments += `<circle cx="${CX}" cy="${CY}" r="${R}" fill="transparent" stroke="${COLORS[status]}" stroke-width="3.8" stroke-dasharray="${dash.toFixed(2)} ${(C - dash).toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"/>`;
+                    cum += dash;
                 });
+            } else {
+                segments = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="transparent" stroke="#e2e8f0" stroke-width="3.8"/>`;
+            }
+            const pieEl = document.getElementById('stat-pie-chart');
+            if (pieEl) pieEl.innerHTML = segments;
+
+            const legendEl = document.getElementById('stat-pie-legend');
+            if (legendEl) legendEl.innerHTML = Object.entries(counts)
+                .filter(([, n]) => n > 0)
+                .map(([s, n]) => `<div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${COLORS[s]}"></span>${n} ${s}</div>`)
+                .join('');
+        }
+
+        function renderInitiativeDetails(data) {
+            const el = document.getElementById('stat-initiative-details');
+            if (!el) return;
+            const rows = [];
+            if (data.rndLead) rows.push({ label: 'R&amp;D Lead', value: data.rndLead });
+            if (data.responsiblePM) rows.push({ label: 'PM', value: data.responsiblePM });
+            if (data.criticalItem !== undefined && data.criticalItem !== null && data.criticalItem !== '') {
+                const isCrit = String(data.criticalItem).toLowerCase().includes('yes') || data.criticalItem === true;
+                rows.push({ label: 'Critical Item', value: isCrit ? '&#9888; Yes' : 'No', critical: isCrit });
+            }
+            const groups = new Set();
+            (data.masterFeatures || []).forEach(mf => {
+                (mf.features || []).forEach(f => { if (f.group) groups.add(f.group); });
+            });
+            if (groups.size > 0) rows.push({ label: 'Groups', value: [...groups].join(' &middot; '), wrap: true });
+
+            el.innerHTML = rows.map(r => `<div class="flex items-start justify-between text-xs gap-2">
+                    <span class="text-slate-400 dark:text-slate-500 font-medium flex-shrink-0">${r.label}</span>
+                    <span class="font-semibold text-right ${r.critical ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'} ${r.wrap ? 'leading-relaxed' : 'truncate max-w-[60%]'}">${r.value}</span>
+                </div>`).join('');
+        }
+
+        
+        // ── Gantt chart state ─────────────────────────────────────────────────────
+        let ganttActiveGroups = new Set();
+        let ganttActiveMFs    = new Set();
+
+        const GANTT_HEX_COLORS = [
+            '#0ea5e9','#6366f1','#f43f5e','#f59e0b',
+            '#10b981','#a855f7','#d946ef','#84cc16'
+        ];
+
+        function ganttGroupHex(group, allGroups) {
+            const i = allGroups.indexOf(group);
+            return i >= 0 ? GANTT_HEX_COLORS[i % GANTT_HEX_COLORS.length] : '#94a3b8';
+        }
+
+        // Date-aware health for a feature using actual StartDate / FinishDate
+        function ganttFeatureHealth(f, today) {
+            if (isCancelled(f.status)) return { level: 'cancelled', reasons: [] };
+            if (f.status === 'Completed') return { level: 'good', reasons: [] };
+            if (!f.finishDate) {
+                return { level: 'warning', reasons: [{ level: 'warning', text: 'No Finish Date assigned — delivery timeline undefined' }] };
+            }
+            const finish   = new Date(f.finishDate);
+            const daysLeft = Math.ceil((finish - today) / 86400000);
+            if (daysLeft < 0) {
+                return { level: 'at-risk', reasons: [{ level: 'at-risk',  text: `Past Finish Date by ${-daysLeft} day${-daysLeft === 1 ? '' : 's'} (${f.finishDate})` }] };
+            }
+            if (daysLeft <= 14) {
+                return { level: 'warning', reasons: [{ level: 'warning', text: `Finish Date in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${f.finishDate})` }] };
+            }
+            return { level: 'good', reasons: [] };
+        }
+
+        // MF health for Gantt = worst across its non-cancelled features
+        function ganttMFHealth(mf, today) {
+            if (isCancelled(mf.status)) return { level: 'cancelled', reasons: [] };
+            let level   = 'good';
+            const reasons = [];
+            mf.features.forEach(f => {
+                if (isCancelled(f.status)) return;
+                const fh = ganttFeatureHealth(f, today);
+                level = worseHealth(level, fh.level);
+                fh.reasons.forEach(r => reasons.push({ level: r.level, text: `"${f.name.replace(/\s*\([A-Z]+-\d+\)\s*$/, '').trim()}": ${r.text}` }));
+            });
+            return { level, reasons };
+        }
+
+        function renderGanttChart(data) {
+            const dark    = document.documentElement.classList.contains('dark');
+            const today   = new Date();
+            const mfs     = data.masterFeatures;
+            const piCal   = PI_CALENDAR;
+            const allGroups = getDistinctGroups(mfs);
+            const activeMFs = mfs.filter(mf => !isCancelled(mf.status));
+
+            // ── Palette: dark / light ───────────────────────────────────────────
+            const pal = dark ? {
+                qHeaderBg: '#0f172a', qHeaderText: '#94a3b8', qHeaderBorder: '#334155',
+                qDivider: '#2d3f55', qDividerOpacity: '0.9',
+                qBandEven: 'rgba(255,255,255,0.03)', qBandOdd: 'transparent',
+                mfRowBg: '#162032', mfBorderL: '#3b82f6',
+                mfTextPrimary: '#e2e8f0', mfTextSec: '#94a3b8',
+                mfBarBg: '#334155', mfBarText: '#94a3b8',
+                featRowEven: '#1e293b', featRowOdd: '#18243a', featText: '#94a3b8',
+                unplannedRowBg: '#1c1208', unplannedText: '#fcd34d',
+                unplannedHdrBg: '#251c08', unplannedHdrText: '#f59e0b', unplannedHdrBorder: '#92400e',
+                todayLine: '#f87171', separator: '#334155',
+            } : {
+                qHeaderBg: '#f1f5f9', qHeaderText: '#64748b', qHeaderBorder: '#cbd5e1',
+                qDivider: '#cbd5e1', qDividerOpacity: '0.8',
+                qBandEven: 'rgba(241,245,249,0.55)', qBandOdd: 'transparent',
+                mfRowBg: '#eff6ff', mfBorderL: '#3b82f6',
+                mfTextPrimary: '#1e293b', mfTextSec: '#475569',
+                mfBarBg: '#bfdbfe', mfBarText: '#1e40af',
+                featRowEven: '#f8fafc', featRowOdd: '#ffffff', featText: '#64748b',
+                unplannedRowBg: '#fffbeb', unplannedText: '#92400e',
+                unplannedHdrBg: '#fefce8', unplannedHdrText: '#d97706', unplannedHdrBorder: '#fde68a',
+                todayLine: '#ef4444', separator: '#e2e8f0',
+            };
+
+            // ── Build PI quarter map (sorted, with inferred starts) ────────────
+            const qKeys = Object.keys(piCal).sort((a, b) => {
+                const oa = piOrdinal(a), ob = piOrdinal(b);
+                if (oa !== null && ob !== null) return oa - ob;
+                return (oa !== null) ? -1 : 1;
+            });
+            const qMap = {};
+            qKeys.forEach((q, i) => {
+                const e   = piCal[q];
+                const end = e.end   ? new Date(e.end)   : null;
+                let start = e.start ? new Date(e.start) : null;
+                if (!start && i > 0 && qMap[qKeys[i-1]]?.end)
+                    start = new Date(qMap[qKeys[i-1]].end.getTime() + 86400000);
+                else if (!start && end)
+                    start = new Date(end.getTime() - 91 * 86400000);
+                qMap[q] = { start, end };
+            });
+
+            // Determine which quarters to show
+            let featMinT = Infinity, featMaxT = -Infinity;
+            activeMFs.forEach(mf => mf.features.forEach(f => {
+                if (isCancelled(f.status) || !f.startDate || !f.finishDate) return;
+                featMinT = Math.min(featMinT, new Date(f.startDate).getTime());
+                featMaxT = Math.max(featMaxT, new Date(f.finishDate).getTime());
+            }));
+
+            const chartEl = document.getElementById('gantt-chart');
+            if (featMinT === Infinity) {
+                chartEl.innerHTML = `<p style="font-size:12px;color:${pal.qHeaderText};text-align:center;padding:40px 0">No features have Start/Finish dates.</p>`;
+                return;
             }
 
-            // Legend labels - one per distinct group actually found in the Theme allocation, not a fixed set
-            const legend = document.getElementById("stat-distribution-legend");
-            legend.innerHTML = groupNames.map(group => {
-                const color = groupColor(group, groupNames);
-                return `<span class="flex items-center gap-1"><span class="w-2 h-2 rounded ${color.dot}"></span> ${group} (${counts[group]})</span>`;
-            }).join("");
+            const visQ = qKeys.filter(q => {
+                const qd = qMap[q];
+                return qd.start && qd.end
+                    && qd.end.getTime() >= featMinT
+                    && qd.start.getTime() <= featMaxT;
+            });
+            const N = visQ.length;
+
+            // ── Equal-width quarter mapping ─────────────────────────────────────
+            function dateToPct(dateMs) {
+                if (N === 0) return 0;
+                for (let i = 0; i < N; i++) {
+                    const qd    = qMap[visQ[i]];
+                    const qEndT = qd.end.getTime();
+                    if (dateMs <= qEndT) {
+                        const qStartT = qd.start.getTime();
+                        const qDur    = qEndT - qStartT || 1;
+                        const fracInQ = Math.max(0, Math.min(1, (dateMs - qStartT) / qDur));
+                        return ((i + fracInQ) / N) * 100;
+                    }
+                }
+                return 100;
+            }
+            const toPct     = t => Math.max(0, Math.min(100, dateToPct(t)));
+            const todayPct  = toPct(today.getTime());
+
+            // ── Filter pills ────────────────────────────────────────────────────
+            const inactivePill = dark
+                ? 'background:#1e293b;color:#64748b;border-color:#334155'
+                : 'background:#f1f5f9;color:#64748b;border-color:#e2e8f0';
+            const gfEl = document.getElementById('gantt-group-filter');
+            if (gfEl) {
+                const pills = allGroups.map(g => {
+                    const active = ganttActiveGroups.size === 0 || ganttActiveGroups.has(g);
+                    const hex    = ganttGroupHex(g, allGroups);
+                    const style  = active ? `background:${hex};color:#fff;border-color:${hex}` : inactivePill;
+                    return `<button onclick="toggleGanttGroup('${g}')" style="${style};padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;border:1px solid;cursor:pointer;transition:all .15s">${g}</button>`;
+                });
+                if (ganttActiveGroups.size > 0) pills.push(`<button onclick="clearGanttGroups()" style="padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;border:1px dashed ${dark?'#475569':'#cbd5e1'};color:#94a3b8;background:transparent;cursor:pointer">Clear</button>`);
+                gfEl.innerHTML = pills.join('');
+            }
+            const mfFEl = document.getElementById('gantt-mf-filter');
+            if (mfFEl) {
+                const activeMFPill = dark ? 'background:#334155;color:#e2e8f0;border-color:#475569' : 'background:#334155;color:#fff;border-color:#334155';
+                const pills = activeMFs.map((mf, i) => {
+                    const active = ganttActiveMFs.size === 0 || ganttActiveMFs.has(i);
+                    const short  = mf.name.replace(/^Master-Feature:\s*/i,'').replace(/\s*\([A-Z]+-\d+\)\s*$/,'').trim();
+                    return `<button onclick="toggleGanttMF(${i})" title="${mf.name}" style="${active ? activeMFPill : inactivePill};padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;border:1px solid;cursor:pointer;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .15s">${short}</button>`;
+                });
+                if (ganttActiveMFs.size > 0) pills.push(`<button onclick="clearGanttMFs()" style="padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;border:1px dashed ${dark?'#475569':'#cbd5e1'};color:#94a3b8;background:transparent;cursor:pointer">Clear</button>`);
+                mfFEl.innerHTML = pills.join('');
+            }
+
+            // ── Draw helpers ────────────────────────────────────────────────────
+            const LW = 280;
+
+            // Alternating PI-quarter tint bands for a row's chart area
+            function piQBands() {
+                return visQ.map((q, qi) => {
+                    const bg = qi % 2 === 0 ? pal.qBandEven : pal.qBandOdd;
+                    if (!bg || bg === 'transparent') return '';
+                    return `<div style="position:absolute;top:0;bottom:0;left:${(qi/N*100).toFixed(2)}%;width:${(100/N).toFixed(2)}%;background:${bg};pointer-events:none"></div>`;
+                }).join('');
+            }
+
+            function quarterDividers() {
+                let s = '';
+                for (let qi = 1; qi < N; qi++) {
+                    s += `<div style="position:absolute;top:0;bottom:0;left:${(qi/N*100).toFixed(2)}%;width:1px;background:${pal.qDivider};opacity:${pal.qDividerOpacity}"></div>`;
+                }
+                return s;
+            }
+
+            const todayLine = (opacity) =>
+                todayPct >= 0 && todayPct <= 100
+                    ? `<div style="position:absolute;top:0;bottom:0;left:${todayPct.toFixed(2)}%;width:2px;background:${pal.todayLine};opacity:${opacity};border-radius:1px;z-index:2"></div>`
+                    : '';
+
+            // ── Quarter header row ──────────────────────────────────────────────
+            let html = `
+            <div style="display:flex;align-items:flex-end;margin-bottom:2px">
+                <div style="width:${LW}px;flex-shrink:0;padding-bottom:5px;padding-left:4px">
+                    <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${pal.qHeaderText}">Master Feature / Feature</span>
+                </div>
+                <div style="flex:1;position:relative;height:30px;background:${pal.qHeaderBg};border-radius:6px 6px 0 0;border:1px solid ${pal.qHeaderBorder};border-bottom:2px solid ${pal.mfBorderL}">`;
+            visQ.forEach((q, qi) => {
+                const borderR = qi < N - 1 ? `border-right:1px solid ${pal.qDivider}` : '';
+                html += `<div style="position:absolute;left:${(qi/N*100).toFixed(2)}%;width:${(100/N).toFixed(2)}%;height:100%;display:flex;align-items:center;justify-content:center;${borderR}">
+                    <span style="font-size:10px;font-weight:800;color:${pal.qHeaderText};letter-spacing:.04em">${q}</span>
+                </div>`;
+            });
+            html += `</div></div>`;
+
+            // ── MF and feature rows ─────────────────────────────────────────────
+            let rowIdx = 0;
+
+            activeMFs.forEach((mf, mfI) => {
+                if (ganttActiveMFs.size > 0 && !ganttActiveMFs.has(mfI)) return;
+
+                const datedFeats   = mf.features.filter(f => !isCancelled(f.status) && f.startDate && f.finishDate);
+                const undatedFeats = mf.features.filter(f =>
+                    !isCancelled(f.status) && (!f.startDate || !f.finishDate) &&
+                    (ganttActiveGroups.size === 0 || ganttActiveGroups.has(f.group))
+                );
+                const visFeats = mf.features.filter(f => {
+                    if (isCancelled(f.status)) return false;
+                    if (ganttActiveGroups.size > 0 && !ganttActiveGroups.has(f.group)) return false;
+                    return f.startDate && f.finishDate;
+                });
+
+                if (datedFeats.length === 0 && undatedFeats.length === 0) return;
+
+                // MF summary bar
+                let mfBarHtml = '';
+                if (datedFeats.length > 0) {
+                    const mfMinT = Math.min(...datedFeats.map(f => new Date(f.startDate).getTime()));
+                    const mfMaxT = Math.max(...datedFeats.map(f => new Date(f.finishDate).getTime()));
+                    const barL = toPct(mfMinT).toFixed(2);
+                    const barW = Math.max(0.5, toPct(mfMaxT) - toPct(mfMinT)).toFixed(2);
+                    mfBarHtml = `<div style="position:absolute;left:${barL}%;width:${barW}%;top:50%;transform:translateY(-50%);height:14px;background:${pal.mfBarBg};border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:1">
+                        <span style="font-size:9px;font-weight:700;color:${pal.mfBarText};padding:0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${mf.progress}% &middot; ${mf.status}</span>
+                    </div>`;
+                }
+
+                const mfHealth = ganttMFHealth(mf, today);
+
+                // MF row: distinct background + left blue accent border
+                html += `<div style="display:flex;align-items:flex-start;padding:6px 0;background:${pal.mfRowBg};border-left:3px solid ${pal.mfBorderL};margin-bottom:1px">
+                    <div style="width:${LW - 3}px;flex-shrink:0;padding-left:8px;padding-right:10px;overflow:hidden">
+                        <span style="font-size:11px;font-weight:700;color:${pal.mfTextPrimary};line-height:1.35;word-break:break-word;display:block">${linkifyJiraKeys(mf.name.replace(/^Master-Feature:\s*/i,''))}</span>
+                        <div style="margin-top:3px">${healthBadgeHtml(mfHealth)}</div>
+                    </div>
+                    <div style="flex:1;position:relative;min-height:32px">
+                        ${piQBands()}
+                        ${quarterDividers()}
+                        ${mfBarHtml}
+                        ${todayLine('0.7')}
+                    </div>
+                </div>`;
+                rowIdx++;
+
+                // Feature rows (dated)
+                visFeats.forEach(f => {
+                    const hex    = ganttGroupHex(f.group, allGroups);
+                    const fHealth = ganttFeatureHealth(f, today);
+                    const fRowBg  = rowIdx % 2 === 0 ? pal.featRowEven : pal.featRowOdd;
+                    const bL = toPct(new Date(f.startDate).getTime()).toFixed(2);
+                    const bW = Math.max(0.3, toPct(new Date(f.finishDate).getTime()) - parseFloat(bL)).toFixed(2);
+
+                    html += `<div style="display:flex;align-items:flex-start;padding:4px 0;background:${fRowBg}">
+                        <div style="width:${LW}px;flex-shrink:0;padding-left:20px;padding-right:10px;overflow:hidden;display:flex;align-items:flex-start;gap:6px">
+                            <span style="width:7px;height:7px;border-radius:50%;background:${hex};flex-shrink:0;margin-top:3px"></span>
+                            <div style="flex:1;min-width:0">
+                                <span style="font-size:10px;color:${pal.featText};line-height:1.35;word-break:break-word;display:block">${linkifyJiraKeys(f.name)}</span>
+                                <div style="margin-top:2px">${healthBadgeHtml(fHealth)}</div>
+                            </div>
+                        </div>
+                        <div style="flex:1;position:relative;min-height:28px">
+                            ${piQBands()}
+                            ${quarterDividers()}
+                            <div style="position:absolute;left:${bL}%;width:${bW}%;top:50%;transform:translateY(-50%);height:18px;background:${hex};border-radius:4px;opacity:0.9;display:flex;align-items:center;overflow:hidden;z-index:1" title="${f.name} | ${f.group||''} | ${f.startDate} \u2192 ${f.finishDate}">
+                                <span style="font-size:9px;color:#fff;font-weight:700;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.progress}% &middot; ${f.jiraStatus||f.status}</span>
+                            </div>
+                            ${todayLine('0.5')}
+                        </div>
+                    </div>`;
+                    rowIdx++;
+                });
+
+                // Unplanned features (no start/finish date)
+                if (undatedFeats.length > 0) {
+                    html += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0 2px;padding-left:${LW}px">
+                        <div style="flex:1;height:1px;background:${pal.unplannedHdrBorder}"></div>
+                        <span style="font-size:9px;font-weight:700;color:${pal.unplannedHdrText};text-transform:uppercase;letter-spacing:.04em;background:${pal.unplannedHdrBg};padding:1px 8px;border-radius:4px;border:1px solid ${pal.unplannedHdrBorder};white-space:nowrap">&#9888; Unplanned</span>
+                        <div style="flex:1;height:1px;background:${pal.unplannedHdrBorder}"></div>
+                    </div>`;
+
+                    undatedFeats.forEach(f => {
+                        const hex = ganttGroupHex(f.group, allGroups);
+                        html += `<div style="display:flex;align-items:flex-start;padding:4px 0;background:${pal.unplannedRowBg}">
+                            <div style="width:${LW}px;flex-shrink:0;padding-left:20px;padding-right:10px;overflow:hidden;display:flex;align-items:flex-start;gap:6px">
+                                <span style="width:7px;height:7px;border-radius:50%;background:${hex};flex-shrink:0;margin-top:3px"></span>
+                                <div style="flex:1;min-width:0">
+                                    <span style="font-size:10px;color:${pal.unplannedText};line-height:1.35;word-break:break-word;display:block">${linkifyJiraKeys(f.name)}</span>
+                                    <div style="margin-top:2px">${healthBadgeHtml(ganttFeatureHealth(f, today))}</div>
+                                </div>
+                            </div>
+                            <div style="flex:1;min-height:24px;display:flex;align-items:center;padding:2px 0">
+                                <span style="font-size:9px;color:${pal.unplannedText};font-style:italic;border:1px dashed ${pal.unplannedHdrBorder};padding:1px 8px;border-radius:4px">${f.jiraStatus||f.status}${f.progress != null ? ' &middot; ' + f.progress + '%' : ''} &mdash; No Start/Finish Date</span>
+                            </div>
+                        </div>`;
+                        rowIdx++;
+                    });
+                }
+
+                // Separator between MF groups
+                html += `<div style="border-top:2px solid ${pal.separator};margin:3px 0 1px"></div>`;
+            });
+
+            chartEl.innerHTML = html;
+        }
+        function toggleGanttGroup(g) {
+            if (ganttActiveGroups.has(g)) ganttActiveGroups.delete(g);
+            else ganttActiveGroups.add(g);
+            renderGanttChart(INITIATIVE_DATA[currentInitiativeKey]);
+        }
+        function clearGanttGroups() {
+            ganttActiveGroups.clear();
+            renderGanttChart(INITIATIVE_DATA[currentInitiativeKey]);
+        }
+        function toggleGanttMF(i) {
+            if (ganttActiveMFs.has(i)) ganttActiveMFs.delete(i);
+            else ganttActiveMFs.add(i);
+            renderGanttChart(INITIATIVE_DATA[currentInitiativeKey]);
+        }
+        function clearGanttMFs() {
+            ganttActiveMFs.clear();
+            renderGanttChart(INITIATIVE_DATA[currentInitiativeKey]);
         }
 
         // Shared status pill classes (Master-Feature milestone cards use these; Feature cards have their own richer variant)
@@ -1442,7 +1792,7 @@
 
             const piLanes = getSortedMasterFeatureTargetPIs(masterFeatures);
 
-            elMilestonesContainer.innerHTML = piLanes.map(pi => {
+            if (elMilestonesContainer) elMilestonesContainer.innerHTML = piLanes.map(pi => {
                 const laneItems = masterFeatures.filter(mf => mf.targetDate === pi);
                 const isResolved = piOrdinal(pi) !== null;
                 const pillClass = isResolved
@@ -1670,6 +2020,32 @@
             }];
         }
 
+        function collectNoDateInsight(masterFeatures) {
+            const items = [];
+            masterFeatures.forEach(mf => {
+                if (isCancelled(mf.status)) return;
+                mf.features.forEach(f => {
+                    if (isCancelled(f.status) || f.status === 'Completed') return;
+                    if (!f.startDate || !f.finishDate) {
+                        items.push({
+                            name: f.name,
+                            kind: 'Theme',
+                            status: f.jiraStatus || f.status,
+                            progress: f.progress,
+                            note: 'No Start/Finish Date — cannot be placed on Gantt'
+                        });
+                    }
+                });
+            });
+            if (items.length === 0) return [];
+            return [{
+                id: 'no-start-finish-date',
+                severity: 'warning',
+                title: `${items.length} feature${items.length === 1 ? '' : 's'} missing Start/Finish Date — unplanned on Gantt`,
+                items,
+            }];
+        }
+
         function computeInsightGroups(data) {
             const groups = [
                 ...collectMismatchGroups(data.masterFeatures),
@@ -1677,18 +2053,44 @@
                 ...collectTimelineMismatchGroup(data),
                 ...collectNoGroupWarnings(data.masterFeatures),
                 ...collectNoPlannedPiInsight(data.masterFeatures),
+                ...collectReadinessInsight(data),
+                ...collectNoDateInsight(data.masterFeatures),
             ];
             const severityOrder = { critical: 0, warning: 1 };
             return groups.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
         }
 
+        function collectReadinessInsight(data) {
+            const DOC_LABELS = { requirements: 'Requirements (PRD)', techSolution: 'Tech Solution', architecture: 'Architecture' };
+            function missingDocs(readiness) {
+                if (!readiness || typeof readiness !== 'object') return [];
+                return Object.keys(DOC_LABELS).filter(k => !readiness[k] || readiness[k].status !== 'ok').map(k => DOC_LABELS[k]);
+            }
+            const items = [];
+            const initMissing = missingDocs(data.readiness);
+            if (initMissing.length > 0) {
+                items.push({ name: data.title || 'Initiative', kind: 'Initiative', status: 'Docs missing', progress: null, note: initMissing.join(', ') });
+            }
+            (data.masterFeatures || []).forEach(mf => {
+                if (isCancelled(mf.status)) return;
+                const mfMissing = missingDocs(mf.readiness);
+                if (mfMissing.length > 0) {
+                    items.push({ name: mf.name, kind: 'Master Feature', status: 'Docs missing', progress: null, note: mfMissing.join(', ') });
+                }
+            });
+            if (items.length === 0) return [];
+            return [{ id: 'readiness-missing', title: `Documentation incomplete — ${items.length} item${items.length === 1 ? '' : 's'} missing docs`, severity: 'warning', items }];
+        }
+
         function renderInsights(data) {
-            const groups = computeInsightGroups(data);
-            const totalItems = groups.reduce((sum, g) => sum + g.items.length, 0);
-            elInsightsCountBadge.innerText = `${groups.length} Insight${groups.length === 1 ? '' : 's'} \u00b7 ${totalItems} item${totalItems === 1 ? '' : 's'}`;
+            const groups      = computeInsightGroups(data);
+            const featureRows = buildFeatureInsightsTable(data);
+            const generalRows = collectGeneralInsights(data);
+            const total = featureRows.length + generalRows.length;
+            elInsightsCountBadge.innerText = `${total} Insight${total === 1 ? '' : 's'}`;
 
             renderInsightsSummary(groups);
-            renderInsightsDetail(groups);
+            renderInsightsDetail(featureRows, generalRows);
         }
 
         // Executive Summary tab: one compact, clickable card per group
@@ -1716,50 +2118,427 @@
         }
 
         // Insights tab: full item table per group
-        function renderInsightsDetail(groups) {
-            if (groups.length === 0) {
-                elInsightsDetailContainer.innerHTML = `<p class="text-slate-300 dark:text-slate-700 italic text-xs text-center font-mono py-8">No mismatches or deadline risks detected in the current data.</p>`;
+        // ── Insight Tab: feature-level insight rows ──────────────────────────────────
+        // Returns array of { mfName, mfKey, featureName, featureKey, insight, suggestedAction, fixPrompt, severity }
+        function buildFeatureInsightsTable(data) {
+            const rows = [];
+            const today = new Date();
+
+            function extractKey(name) {
+                const m = (name || '').match(/\(([A-Z]+-\d+)\)\s*$/);
+                return m ? m[1] : null;
+            }
+            function cleanName(name) {
+                return (name || '').replace(/\s*\([A-Z]+-\d+\)\s*$/, '').trim();
+            }
+            function push(mf, f, insight, suggestedAction, fixPrompt, severity) {
+                rows.push({
+                    mfName: mf.name,
+                    mfKey: extractKey(mf.name),
+                    featureName: cleanName(f.name),
+                    featureKey: extractKey(f.name),
+                    insight, suggestedAction, fixPrompt,
+                    severity: severity || 'warning'
+                });
+            }
+
+            (data.masterFeatures || []).forEach(mf => {
+                if (isCancelled(mf.status)) return;
+                mf.features.forEach(f => {
+                    if (isCancelled(f.status)) return;
+                    const notDone = f.status !== 'Completed';
+                    const fKey = extractKey(f.name) || f.name;
+
+                    // 1. No Planned PI
+                    if (notDone && (!f.date || f.date === 'N/A' || f.date === 'TBD')) {
+                        push(mf, f,
+                            'No Planned PI assigned \u2014 delivery timeline is undefined',
+                            'Set the Planned PI field in Jira to establish a delivery commitment',
+                            `Update Jira issue ${fKey}: set the Planned PI field (customfield_14422) to the next appropriate delivery quarter. Coordinate with the PM to align on the target PI.`,
+                            'warning');
+                    } else if (notDone) {
+                        // 2. PI deadline check
+                        const entry = resolvePiCalendarEntry(f.date);
+                        if (entry && entry.end) {
+                            const end = new Date(entry.end + 'T00:00:00');
+                            const daysLeft = daysBetween(today, end);
+                            if (daysLeft < 0) {
+                                push(mf, f,
+                                    `Planned PI ${f.date} ended ${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? '' : 's'} ago \u2014 feature still open at ${f.progress}%`,
+                                    'Move to next PI in Jira, escalate to the team lead, or close if scope was cut',
+                                    `Jira issue ${fKey} has an expired Planned PI (${f.date}); it is still open at ${f.progress}% completion. Either (a) transition the issue to Done/Closed if the work is complete, or (b) update Planned PI (customfield_14422) to the next available quarter and add a comment explaining the delay.`,
+                                    'critical');
+                            } else if (daysLeft <= PI_DEADLINE_SOON_DAYS) {
+                                push(mf, f,
+                                    `Planned PI ${f.date} ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} \u2014 currently ${f.progress}% complete`,
+                                    daysLeft <= 7
+                                        ? 'Escalate immediately: review blockers daily and brief the PM on delivery risk'
+                                        : 'Accelerate remaining work or negotiate scope; plan PI transition if delivery will slip',
+                                    `Jira issue ${fKey} is in Planned PI ${f.date} which ends in ${daysLeft} days, with only ${f.progress}% done. Add a comment with a progress update (what is complete, what remains, any blockers). If the deadline cannot be met, update Planned PI (customfield_14422) to the next quarter and notify the PM.`,
+                                    daysLeft <= 14 ? 'critical' : 'warning');
+                            }
+                        }
+                    }
+
+                    // 3. Missing Start / Finish Date
+                    const missingStart = !f.startDate;
+                    const missingFinish = !f.finishDate;
+                    if (notDone && (missingStart || missingFinish)) {
+                        const what = (missingStart && missingFinish) ? 'Start and Finish Date'
+                                   : missingStart ? 'Start Date' : 'Finish Date';
+                        const fieldHint = (missingStart && missingFinish)
+                            ? 'Start Date (customfield_21220) and Finish Date (customfield_21221)'
+                            : missingStart ? 'Start Date (customfield_21220)' : 'Finish Date (customfield_21221)';
+                        push(mf, f,
+                            `Missing ${what} \u2014 feature cannot be placed on the Gantt chart`,
+                            'Set Start Date and Finish Date in Jira to enable scheduling, health tracking and Gantt visibility',
+                            `Update Jira issue ${fKey}: set ${fieldHint} based on the team's delivery plan for this feature. Coordinate with the feature owner to agree on realistic dates, then update Jira accordingly.`,
+                            'warning');
+                    } else if (notDone && f.finishDate) {
+                        // 4. Finish Date proximity / overdue
+                        const finishD = new Date(f.finishDate + 'T00:00:00');
+                        const daysToFinish = daysBetween(today, finishD);
+                        if (daysToFinish < 0) {
+                            push(mf, f,
+                                `Finish Date was ${Math.abs(daysToFinish)} day${Math.abs(daysToFinish) === 1 ? '' : 's'} ago \u2014 feature still open (${f.progress}% done)`,
+                                'Update the Finish Date in Jira, surface blockers to the team, or close if scope was cut',
+                                `Jira issue ${fKey} — Finish Date (${f.finishDate}) has passed and the feature is still open at ${f.progress}%. Either (a) transition to Done/Closed if work is complete, or (b) update Finish Date (customfield_21221) to a realistic new target and add a comment explaining the delay.`,
+                                'critical');
+                        } else if (daysToFinish <= 14) {
+                            push(mf, f,
+                                `Finish Date in ${daysToFinish} day${daysToFinish === 1 ? '' : 's'} \u2014 currently ${f.progress}% complete`,
+                                daysToFinish <= 7
+                                    ? 'Review remaining tasks daily with the owner; update PM if delivery will slip'
+                                    : 'Track progress closely; update Finish Date proactively if delivery will be delayed',
+                                `Add a comment to Jira issue ${fKey}: report current completion (${f.progress}%), list remaining work, and confirm whether the Finish Date (${f.finishDate}) is still achievable. If the deadline will be missed, update Finish Date (customfield_21221) to a new date and notify the PM.`,
+                                daysToFinish <= 7 ? 'critical' : 'warning');
+                        }
+                    }
+
+                    // 5. No Group assigned
+                    if (!f.group) {
+                        push(mf, f,
+                            'No Group assigned \u2014 workload distribution and group filtering are incomplete',
+                            'Set the Group field in Jira so this feature appears in group reports and filters',
+                            `Update Jira issue ${fKey}: set the Group field (customfield_22029) to the responsible team/group for this feature. Check sibling features under the same Master Feature for the correct group value.`,
+                            'warning');
+                    }
+
+                    // 6. Status / Progress mismatch
+                    if (f.status === 'Completed' && f.progress < 100) {
+                        push(mf, f,
+                            `Marked Completed in Jira but progress is only ${f.progress}% \u2014 may have been closed prematurely`,
+                            'Update progress to 100% in Jira, or reopen the feature if meaningful work still remains',
+                            `Jira issue ${fKey} is marked Completed but progress shows only ${f.progress}%. Either (a) update the progress field to 100% if all work is truly done, or (b) reopen/reactivate the issue and set status to In Progress if significant work still remains.`,
+                            'critical');
+                    } else if (f.status === 'In Progress' && f.progress === 0) {
+                        push(mf, f,
+                            'Status is "In Progress" but progress shows 0% \u2014 no measurable work logged yet',
+                            'Update the progress percentage in Jira to reflect actual completion, or verify the feature has truly started',
+                            `Jira issue ${fKey} is In Progress but shows 0% completion. Update the progress percentage to reflect actual work done. If the feature has not truly started yet, consider transitioning status back to Planned/Open to keep the dashboard accurate.`,
+                            'warning');
+                    }
+                });
+            });
+
+            return rows;
+        }
+
+        // HTML-attribute escaping for data-* values (used by fix-prompt copy buttons)
+        function escAttr(s) {
+            return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        // Copy fix-prompt text to clipboard; button briefly shows "Copied!"
+        function copyFixPrompt(btn) {
+            const text = btn.getAttribute('data-prompt') || '';
+            navigator.clipboard.writeText(text).catch(() => {});
+            const orig = btn.textContent;
+            btn.textContent = '\u2713 Copied!';
+            setTimeout(() => { btn.textContent = orig; }, 1800);
+        }
+
+        // General (initiative-level) insights: missing docs, timeline mismatch
+        function collectGeneralInsights(data) {
+            const rows = [];
+            const DOC_LABELS = { requirements: 'Requirements (PRD)', techSolution: 'Tech Solution', architecture: 'Architecture' };
+
+            function missingDocs(readiness) {
+                if (!readiness || typeof readiness !== 'object') return [];
+                return Object.keys(DOC_LABELS)
+                    .filter(k => !readiness[k] || readiness[k].status !== 'ok')
+                    .map(k => DOC_LABELS[k]);
+            }
+            function extractKey(name) {
+                const m = (name || '').match(/\(([A-Z]+-\d+)\)\s*$/);
+                return m ? m[1] : null;
+            }
+            function cleanName(name) {
+                return (name || '').replace(/^Master-Feature:\s*/i, '').replace(/\s*\([A-Z]+-\d+\)\s*$/, '').trim();
+            }
+
+            // 1. Initiative-level missing documentation
+            const initMissing = missingDocs(data.readiness);
+            if (initMissing.length > 0) {
+                const initKey = currentInitiativeKey || null;
+                const initUrl = JIRA_BASE_URL && initKey ? JIRA_BASE_URL + initKey : null;
+                rows.push({
+                    itemName: data.title || 'Initiative',
+                    itemKey: initKey,
+                    itemUrl: initUrl,
+                    insight: `Initiative missing documentation: ${initMissing.join(', ')}`,
+                    suggestedAction: 'Create and link the missing documents in Jira to ensure requirements and design are tracked',
+                    fixPrompt: `Update Jira issue ${initKey || 'the initiative'}: add or link the missing documents (${initMissing.join(', ')}) to the appropriate document fields.`,
+                    severity: 'warning',
+                });
+            }
+
+            // 2. Master-Feature-level missing documentation
+            (data.masterFeatures || []).forEach(mf => {
+                if (isCancelled(mf.status)) return;
+                const mfMissing = missingDocs(mf.readiness);
+                if (mfMissing.length > 0) {
+                    const mfKey = extractKey(mf.name);
+                    const mfUrl = JIRA_BASE_URL && mfKey ? JIRA_BASE_URL + mfKey : null;
+                    rows.push({
+                        itemName: cleanName(mf.name),
+                        itemKey: mfKey,
+                        itemUrl: mfUrl,
+                        insight: `Master Feature missing documentation: ${mfMissing.join(', ')}`,
+                        suggestedAction: 'Add or link the missing documents for this Master Feature in Jira',
+                        fixPrompt: `Update Jira issue ${mfKey || mf.name}: add or link the missing documents (${mfMissing.join(', ')}) to the Requirements, Tech Solution, or Architecture fields.`,
+                        severity: 'warning',
+                    });
+                }
+            });
+
+            // 3. Timeline mismatch: latest Planned PI exceeds Delivery Target
+            const mismatch = detectTimelineOffTrack(data);
+            if (mismatch) {
+                const initKey = currentInitiativeKey || null;
+                const initUrl = JIRA_BASE_URL && initKey ? JIRA_BASE_URL + initKey : null;
+                rows.push({
+                    itemName: data.title || 'Initiative',
+                    itemKey: initKey,
+                    itemUrl: initUrl,
+                    insight: `Latest Planned PI (${mismatch.piLabel}) ends ${mismatch.daysLate} day${mismatch.daysLate === 1 ? '' : 's'} after the Delivery Target (${data.timelineRange}) \u2014 initiative is Off Track`,
+                    suggestedAction: 'Negotiate scope reduction or update the Delivery Target to reflect the new expected end date',
+                    fixPrompt: `Update Jira initiative ${initKey || ''}: the latest Planned PI (${mismatch.piLabel}) exceeds the Delivery Target (${data.timelineRange}) by ${mismatch.daysLate} days. Either update the Delivery Target field (customfield_22933) to a later date, or work with the PM to reduce scope and bring all features within the current target.`,
+                    severity: 'critical',
+                });
+            }
+
+            return rows;
+        }
+
+        // Insights tab: swimlane per Master-Feature (critical MFs first) + General section
+        function renderInsightsDetail(featureRows, generalRows) {
+            const elContainer = elInsightsDetailContainer;
+
+            if (featureRows.length === 0 && generalRows.length === 0) {
+                elContainer.innerHTML = `<p class="text-slate-300 dark:text-slate-700 italic text-xs text-center font-mono py-8">No issues detected \u2014 all features appear to be on track.</p>`;
                 return;
             }
 
-            elInsightsDetailContainer.innerHTML = groups.map(g => {
-                const style = INSIGHT_SEVERITY_STYLES[g.severity] || INSIGHT_SEVERITY_STYLES.warning;
-                const rows = g.items.map(item => `
-                    <tr class="border-b border-slate-100 dark:border-slate-800/60 last:border-b-0">
-                        <td class="py-2.5 px-3 text-xs font-medium text-slate-700 dark:text-slate-200">${linkifyJiraKeys(item.name)}</td>
-                        <td class="py-2.5 px-3 text-center"><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">${item.kind}</span></td>
-                        <td class="py-2.5 px-3 text-center text-xs text-slate-600 dark:text-slate-300">${item.status}</td>
-                        <td class="py-2.5 px-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400">${typeof item.progress === "number" ? item.progress + "%" : "\u2014"}</td>
-                        <td class="py-2.5 px-3 text-right font-mono text-[10px] text-slate-400">${item.note || ''}</td>
-                    </tr>
-                `).join("");
+            // ── Build MF swimlane groups ────────────────────────────────────
+            const byMF = new Map();
+            featureRows.forEach(r => {
+                const key = r.mfKey || r.mfName;
+                if (!byMF.has(key)) byMF.set(key, { mfName: r.mfName, mfKey: r.mfKey, rows: [] });
+                byMF.get(key).rows.push(r);
+            });
+
+            // Sort: MFs with at least one critical row first
+            const mfGroups = [...byMF.values()].sort((a, b) => {
+                const aCrit = a.rows.some(r => r.severity === 'critical') ? 0 : 1;
+                const bCrit = b.rows.some(r => r.severity === 'critical') ? 0 : 1;
+                return aCrit - bCrit;
+            });
+
+            // ── Swimlane renderer (reusable for MF and General) ─────────────
+            function renderSwimlane(headerHtml, rows) {
+                const critCount = rows.filter(r => r.severity === 'critical').length;
+                const warnCount = rows.filter(r => r.severity === 'warning').length;
+
+                const tableRows = rows.map(r => {
+                    const style = INSIGHT_SEVERITY_STYLES[r.severity] || INSIGHT_SEVERITY_STYLES.warning;
+                    const featUrl  = r.itemUrl || (JIRA_BASE_URL && r.featureKey ? JIRA_BASE_URL + r.featureKey : null);
+                    const dispKey  = r.itemKey || r.featureKey || null;
+                    const dispName = r.itemName !== undefined ? r.itemName : r.featureName;
+                    return `
+                        <tr class="border-b border-slate-100 dark:border-slate-800/60 last:border-b-0 hover:bg-slate-50/40 dark:hover:bg-slate-800/20 align-top">
+                            <td class="py-2.5 px-3 text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[220px]">
+                                <span class="block leading-snug">${dispName}</span>
+                            </td>
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
+                                ${featUrl && dispKey
+                                    ? `<a href="${featUrl}" target="_blank" rel="noopener" class="font-mono text-brand-600 dark:text-brand-400 hover:underline">${dispKey}</a>`
+                                    : (dispKey ? `<span class="font-mono text-[10px] text-slate-400">${dispKey}</span>` : `<span class="text-slate-400 dark:text-slate-600 font-mono text-[10px]">\u2014</span>`)}
+                            </td>
+                            <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-300">
+                                <div class="flex items-start gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0 mt-[3px]"></span>
+                                    <span>${r.insight}</span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-xs text-slate-500 dark:text-slate-400">
+                                <div class="flex flex-col gap-1.5">
+                                    <span>${r.suggestedAction}</span>
+                                    ${r.fixPrompt ? `<button
+                                        data-prompt="${escAttr(r.fixPrompt)}"
+                                        onclick="copyFixPrompt(this)"
+                                        class="self-start text-[9px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-800 hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-all whitespace-nowrap">
+                                        \u{1F916} Copy AI prompt
+                                    </button>` : ''}
+                                </div>
+                            </td>
+                        </tr>`;
+                }).join('');
+
+                const badgeHtml = [
+                    critCount > 0 ? `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">${critCount} Critical</span>` : '',
+                    warnCount > 0 ? `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">${warnCount} Warning</span>` : '',
+                ].filter(Boolean).join('');
 
                 return `
-                    <div id="insight-group-${g.id}" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden scroll-mt-4">
-                        <div class="p-4 flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full ${style.dot} flex-shrink-0"></span>
-                                <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">${linkifyJiraKeys(g.title)}</h4>
-                            </div>
-                            <span class="text-[10px] font-semibold uppercase px-2 py-1 rounded ${style.badge} flex-shrink-0">${style.label}</span>
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
+                        ${headerHtml}
+                        <div class="flex items-center gap-1.5 flex-shrink-0">${badgeHtml}</div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[220px]">Item Name</th>
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[90px]">Jira Key</th>
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Insight</th>
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[280px]">Suggested Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }
+
+            // ── Render MF swimlanes (critical first) ────────────────────────
+            let html = mfGroups.map(mfGroup => {
+                const mfJiraUrl  = JIRA_BASE_URL && mfGroup.mfKey ? JIRA_BASE_URL + mfGroup.mfKey : null;
+                const mfClean    = (mfGroup.mfName || '').replace(/^Master-Feature:\s*/i, '').replace(/\s*\([A-Z]+-\d+\)\s*$/, '').trim();
+                const headerHtml = `
+                    <div class="flex items-center gap-2 min-w-0">
+                        <i data-lucide="layers" class="w-4 h-4 text-brand-500 flex-shrink-0"></i>
+                        ${mfJiraUrl
+                            ? `<a href="${mfJiraUrl}" target="_blank" rel="noopener" class="text-sm font-semibold text-slate-800 dark:text-white hover:underline truncate">${mfClean}</a>`
+                            : `<span class="text-sm font-semibold text-slate-800 dark:text-white truncate">${mfClean}</span>`}
+                        ${mfGroup.mfKey ? `<span class="font-mono text-xs text-brand-500 dark:text-brand-400 whitespace-nowrap">${mfGroup.mfKey}</span>` : ''}
+                    </div>`;
+                return renderSwimlane(headerHtml, mfGroup.rows);
+            }).join('\n');
+
+            // ── General section at the bottom ───────────────────────────────
+            if (generalRows && generalRows.length > 0) {
+                const genHeaderHtml = `
+                    <div class="flex items-center gap-2 min-w-0">
+                        <i data-lucide="flag" class="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0"></i>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-white">General</span>
+                        <span class="text-xs text-slate-400 dark:text-slate-500">Initiative-level findings</span>
+                    </div>`;
+                html += '\n' + renderSwimlane(genHeaderHtml, generalRows);
+            }
+
+            elContainer.innerHTML = html;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        function renderInsightsDetail(featureRows) {
+            if (featureRows.length === 0) {
+                elInsightsDetailContainer.innerHTML = `<p class="text-slate-300 dark:text-slate-700 italic text-xs text-center font-mono py-8">No issues detected \u2014 all features appear to be on track.</p>`;
+                return;
+            }
+
+            // Group rows by master-feature (preserve MF order from data)
+            const byMF = new Map();
+            featureRows.forEach(r => {
+                const key = r.mfKey || r.mfName;
+                if (!byMF.has(key)) byMF.set(key, { mfName: r.mfName, mfKey: r.mfKey, rows: [] });
+                byMF.get(key).rows.push(r);
+            });
+
+            const html = [...byMF.values()].map(mfGroup => {
+                const critCount = mfGroup.rows.filter(r => r.severity === 'critical').length;
+                const warnCount = mfGroup.rows.filter(r => r.severity === 'warning').length;
+                const mfJiraUrl = JIRA_BASE_URL && mfGroup.mfKey ? JIRA_BASE_URL + mfGroup.mfKey : null;
+                const mfCleanName = (mfGroup.mfName || '')
+                    .replace(/^Master-Feature:\s*/i, '')
+                    .replace(/\s*\([A-Z]+-\d+\)\s*$/, '')
+                    .trim();
+
+                const tableRows = mfGroup.rows.map(r => {
+                    const style = INSIGHT_SEVERITY_STYLES[r.severity] || INSIGHT_SEVERITY_STYLES.warning;
+                    const featUrl = JIRA_BASE_URL && r.featureKey ? JIRA_BASE_URL + r.featureKey : null;
+                    return `
+                        <tr class="border-b border-slate-100 dark:border-slate-800/60 last:border-b-0 hover:bg-slate-50/40 dark:hover:bg-slate-800/20 align-top">
+                            <td class="py-2.5 px-3 text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[220px]">
+                                <span class="block leading-snug">${r.featureName}</span>
+                            </td>
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
+                                ${featUrl
+                                    ? `<a href="${featUrl}" target="_blank" rel="noopener" class="font-mono text-brand-600 dark:text-brand-400 hover:underline">${r.featureKey}</a>`
+                                    : `<span class="text-slate-400 dark:text-slate-600 font-mono text-[10px]">\u2014</span>`}
+                            </td>
+                            <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-300">
+                                <div class="flex items-start gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0 mt-[3px]"></span>
+                                    <span>${r.insight}</span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-xs text-slate-500 dark:text-slate-400">
+                                <div class="flex flex-col gap-1.5">
+                                    <span>${r.suggestedAction}</span>
+                                    ${r.fixPrompt ? `<button
+                                        data-prompt="${escAttr(r.fixPrompt)}"
+                                        onclick="copyFixPrompt(this)"
+                                        class="self-start text-[9px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-800 hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-all whitespace-nowrap">
+                                        \u{1F916} Copy AI prompt
+                                    </button>` : ''}
+                                </div>
+                            </td>
+                        </tr>`;
+                }).join('');
+
+                return `
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <i data-lucide="layers" class="w-4 h-4 text-brand-500 flex-shrink-0"></i>
+                            ${mfJiraUrl
+                                ? `<a href="${mfJiraUrl}" target="_blank" rel="noopener" class="text-sm font-semibold text-slate-800 dark:text-white hover:underline truncate">${mfCleanName}</a>`
+                                : `<span class="text-sm font-semibold text-slate-800 dark:text-white truncate">${mfCleanName}</span>`}
+                            ${mfGroup.mfKey ? `<span class="font-mono text-xs text-brand-500 dark:text-brand-400 whitespace-nowrap">${mfGroup.mfKey}</span>` : ''}
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="text-[10px] uppercase text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-800">
-                                        <th class="py-2 px-3">Item</th>
-                                        <th class="py-2 px-3 text-center">Type</th>
-                                        <th class="py-2 px-3 text-center">Status</th>
-                                        <th class="py-2 px-3 text-center">Progress</th>
-                                        <th class="py-2 px-3 text-right">Planned PI</th>
-                                    </tr>
-                                </thead>
-                                <tbody>${rows}</tbody>
-                            </table>
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                            ${critCount > 0 ? `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">${critCount} Critical</span>` : ''}
+                            ${warnCount > 0 ? `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">${warnCount} Warning</span>` : ''}
                         </div>
                     </div>
-                `;
-            }).join("");
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[220px]">Item Name</th>
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[90px]">Jira Key</th>
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Insight</th>
+                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[280px]">Suggested Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }).join('\n');
+
+            elInsightsDetailContainer.innerHTML = html;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         // Jump from an Executive Summary insight card to its full item list on the Insights tab
@@ -2213,7 +2992,7 @@
         }
 
         // Switch main content view tabs
-        const TAB_NAMES = ["snapshot", "schedule", "insights"];
+        const TAB_NAMES = ["snapshot", "gantt", "schedule", "insights"];
         const TAB_BTN_ACTIVE_CLASS = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
         const TAB_BTN_INACTIVE_CLASS = "flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
 
@@ -2231,114 +3010,6 @@
             });
             lucide.createIcons();
         }
-
-        // Drawer toggle transitions
-        function toggleCSVEditor() {
-            const hasClass = elCsvDrawer.classList.contains("translate-x-full");
-            if (hasClass) {
-                elCsvDrawer.classList.remove("translate-x-full");
-            } else {
-                elCsvDrawer.classList.add("translate-x-full");
-            }
-        }
-
-        // Build a CSV representation of the current initiative's live data to pre-fill the CSV drawer
-        function buildCsvFromCurrentInitiative() {
-            const data = INITIATIVE_DATA[currentInitiativeKey];
-            const lines = ["Initiative,MasterFeature,FeatureName,GroupAllocation,PlannedFinishDate,Status,Progress"];
-            data.masterFeatures.forEach(mf => {
-                const mfLabel = mf.name.replace(/^Master-Feature:\s*/, "");
-                mf.features.forEach(f => {
-                    lines.push([currentInitiativeKey.toUpperCase(), mfLabel, f.name, f.group, f.date, f.status, f.progress].join(","));
-                });
-            });
-            return lines.join("\n");
-        }
-
-        // Parse modified CSV and update data structures
-        function saveAndApplyCSV() {
-            try {
-                const text = elCsvRawTextarea.value.trim();
-                const lines = text.split("\n");
-                if (lines.length < 2) {
-                    throw new Error("Invalid CSV structural blueprint schema. Must contain headers & data records.");
-                }
-
-                // Temporary object to hold parsed items
-                const parsedMasterFeatures = [];
-
-                for (let i = 1; i < lines.length; i++) {
-                    const parts = lines[i].split(",");
-                    if (parts.length < 6) continue;
-
-                    const rawMfName = "Master-Feature: " + parts[1].trim();
-                    const featureName = parts[2].trim();
-                    const allocationGroup = parts[3].trim();
-                    const rawDate = parts[4].trim();
-                    const rawStatus = parts[5].trim();
-                    const rawProgress = parseInt(parts[6].trim()) || 0;
-
-                    // Locate or push parent Master-Feature structure
-                    let existingMf = parsedMasterFeatures.find(mf => mf.name === rawMfName);
-                    if (!existingMf) {
-                        existingMf = {
-                            name: rawMfName,
-                            status: "In Progress", // Computed later or kept standard
-                            progress: 0,
-                            targetDate: rawDate,
-                            features: []
-                        };
-                        parsedMasterFeatures.push(existingMf);
-                    }
-
-                    // Add feature
-                    existingMf.features.push({
-                        name: featureName,
-                        group: allocationGroup,
-                        status: rawStatus,
-                        progress: rawProgress,
-                        date: rawDate
-                    });
-                }
-
-                // Compute overall master-feature milestones percentages dynamically based on features
-                parsedMasterFeatures.forEach(mf => {
-                    let totalProg = 0;
-                    let isBlocked = false;
-                    let totalFeatures = mf.features.length;
-
-                    mf.features.forEach(f => {
-                        totalProg += f.progress;
-                        if (f.status === "Blocked") isBlocked = true;
-                    });
-
-                    mf.progress = totalFeatures > 0 ? Math.round(totalProg / totalFeatures) : 0;
-
-                    if (mf.progress === 100) {
-                        mf.status = "Completed";
-                    } else if (isBlocked) {
-                        mf.status = "Blocked";
-                    } else {
-                        mf.status = "In Progress";
-                    }
-                });
-
-                // Inject into core structure & re-render
-                INITIATIVE_DATA[currentInitiativeKey].masterFeatures = parsedMasterFeatures;
-
-                // Recalculate stats counts
-                const statsRollups = getFeaturesCompletionMetrics(parsedMasterFeatures);
-                INITIATIVE_DATA[currentInitiativeKey].stats.totalFeatures = statsRollups.total;
-                INITIATIVE_DATA[currentInitiativeKey].stats.completedFeatures = statsRollups.completed;
-
-                renderDashboard();
-                toggleCSVEditor();
-                toastAlert("JIRA CSV Schema Applied Successfully!", "success");
-            } catch (err) {
-                alert("Failed to parse structural layout schema: " + err.message);
-            }
-        }
-
         function reloadDashboard() {
             location.reload();
         }

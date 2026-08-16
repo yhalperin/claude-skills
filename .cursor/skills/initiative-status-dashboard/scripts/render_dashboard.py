@@ -21,7 +21,6 @@ Usage:
 import argparse
 import json
 import sys
-import webbrowser
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -40,7 +39,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Render the initiative status dashboard HTML.")
     parser.add_argument("--data", required=True, help="Path to the initiative data JSON file.")
     parser.add_argument("--out", default=None, help="Output HTML path. Defaults to a stable filename next to the data file, derived from the initiative keys.")
-    parser.add_argument("--no-open", action="store_true", help="Do not open the result in a browser.")
+    parser.add_argument("--no-open", action="store_true", help="(Deprecated, kept for backward compatibility) Has no effect; browser is never opened automatically.")
     args = parser.parse_args()
 
     data_path = Path(args.data)
@@ -82,14 +81,6 @@ def main() -> int:
     out_path.write_text(html, encoding="utf-8")
     print(f"Dashboard written to: {out_path}")
     print(f"Initiatives included: {', '.join(initiatives.keys())}")
-
-    if not args.no_open:
-        # Best-effort only - never let a headless/browserless environment (e.g. a Cloud Agent VM)
-        # turn a successful render into a failed run just because there's nowhere to open it.
-        try:
-            webbrowser.open(out_path.resolve().as_uri())
-        except webbrowser.Error as exc:
-            print(f"Note: could not open a browser ({exc}); dashboard was still written successfully.", file=sys.stderr)
 
     return 0
 
