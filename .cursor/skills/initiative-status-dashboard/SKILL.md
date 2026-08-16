@@ -12,10 +12,13 @@ description: >-
   Initiative timeline slippage with a detailed drill-down Insights tab)
   that opens directly in a browser. Supports a combined dashboard for
   several initiatives at once via a header dropdown. Re-runnable at any
-  point to refresh with current Jira state. Use when the user asks to
-  generate an initiative status dashboard/board, summarize one or more
-  initiatives' progress, or visualize Jira initiative/master-feature
-  rollup as a shareable HTML page.
+  point to refresh with current Jira state. Scope can be provided as direct
+  Jira key(s) OR as a natural-language search (by investment area, PM,
+  RND lead, project, keyword, status, etc.) which is translated to JQL
+  automatically. Use when the user asks to generate an initiative status
+  dashboard/board, summarize one or more initiatives' progress, visualize
+  Jira initiative/master-feature rollup as a shareable HTML page, or search
+  for initiatives matching specific criteria.
 disable-model-invocation: true
 ---
 
@@ -23,9 +26,74 @@ disable-model-invocation: true
 
 Produces one self-contained HTML file - no server, no build step - visualizing one or more Jira Initiatives: KPI cards (overall progress, timeline, group distribution), a Master-Feature milestone card grid with per-item, click-to-explain Health badges (clicking a card jumps to that Master-Feature's row on the PI Delivery Schedule tab), a Master-Feature x Planned-PI delivery schedule table with a multi-select Group filter, and an Automated Insights panel (with a full drill-down "Insights" tab). The visual design is already built into `assets/template.html` - do not redesign it per run, only feed it fresh data.
 
+## Help / usage examples
+
+If the user's request is `/initiative-status-dashboard help` (or includes `--help`), reply with the block below and **stop** - do not fetch any data:
+
+```
+Initiative Status Dashboard – usage examples
+
+  By Jira key (one or more):
+    /initiative-status-dashboard DPA-14520
+    /initiative-status-dashboard DPA-14520 JAG-36913
+
+  By investment area / label:
+    /initiative-status-dashboard for all initiatives in investment area "Atlas"
+    /initiative-status-dashboard investment area Olympus
+
+  By Responsible PM:
+    /initiative-status-dashboard all initiatives where PM is "Jane Doe"
+
+  By Assigned R&D Lead:
+    /initiative-status-dashboard RND lead "John Smith"
+
+  By project:
+    /initiative-status-dashboard all initiatives in project DPA
+
+  By keyword in title:
+    /initiative-status-dashboard initiatives containing "security"
+
+  By status:
+    /initiative-status-dashboard all in-progress initiatives in project DPA
+
+  Combined filters:
+    /initiative-status-dashboard investment area Atlas, PM "Jane Doe"
+
+  Refresh existing dashboard (re-fetch + re-render):
+    /initiative-status-dashboard DPA-14520   ← same command, run again
+
+  Show this help:
+    /initiative-status-dashboard help
+```
+
+---
+
 ## Workflow
 
-1. **Confirm scope.** Get the Initiative issue key(s) to traverse (e.g. `JAG-36913`, or several at once). If the user gave them, use them. Ask only if genuinely ambiguous.
+1. **Resolve scope.** Determine which Initiative issue key(s) to traverse. Three input modes are supported:
+
+   **a) Direct key(s)** — one or more Jira keys like `DPA-14520` or `JAG-36913 DPA-14520`.
+   Use them directly; skip to step 2.
+
+   **b) Named-field search** — the user describes initiatives by a field value rather than a key.
+   Common patterns and how to translate them to JQL:
+
+   | User says | JQL fragment | Notes |
+   |---|---|---|
+   | investment area "Atlas" | `labels = "Atlas"` or `component = "Atlas"` | Try `labels` first; if 0 results try `component`; if still 0, use `jira_search_fields` with keyword `"investment area"` to find the right custom field |
+   | PM / product lead "Jane" | `cf[20021] = "Jane Doe"` | `customfield_20021` = Responsible PM (confirm via `jira_search_fields "Responsible PM"` if unsure) |
+   | RND lead "John" | `cf[21851] = "John Smith"` | `customfield_21851` = Assigned RND Lead (confirm via `jira_search_fields "RND Lead"` if unsure) |
+   | project DPA | `project = DPA` | Standard Jira project key |
+   | contains "security" | `summary ~ "security"` | Free-text title search |
+   | in-progress / active | `statusCategory = "In Progress"` | Use Jira status category, not status name |
+   | critical | `cf[11143] = "Yes"` | Critical Item custom field |
+
+   Build the full JQL: `issuetype = Initiative AND <filter(s)>` and run `jira_search` to get matching keys.
+   - **0 results** → report "No initiatives matched. Try refining your search." and stop.
+   - **1–5 results** → list them (key + title + status) and proceed with all unless the user said "show me" / "list" (in which case stop after listing).
+   - **6+ results** → list them all and ask the user to confirm which to include before fetching data.
+
+   **c) Ambiguous / no scope given** — ask the user: "Which initiative(s) should I build the dashboard for? You can give me a Jira key (e.g. `DPA-14520`) or describe them (e.g. 'all Atlas initiatives' or 'initiatives where PM is Jane Doe')."
 
 2. **Fetch data from Jira.** Use the `user-policy-broker` MCP tools (`jira_get_issue`, `jira_search`, `jira_search_fields`) per broker usage rules - never bypass the broker. For each Initiative:
    - Fetch the Initiative issue itself, including its **Planned PI** custom field (fields `summary,status,customfield_<planned_pi_id>` - confirm the id once per instance via `jira_search_fields` with keyword `"Planned PI"`, e.g. `customfield_14422`, exact name `"PlannedPI"`, a multiselect option field returned as `{ "value": ["27-Q1", "26-Q2"] }`) and its **Delivery Target** custom field (confirm the id via `jira_search_fields` with keyword `"Delivery Target"`, e.g. `customfield_22933`; returned as `{ "value": "YY-MM" }`, e.g. `"26-07"` (July 2026) or `"26-12"` (December 2026) -> `timelineRange`).
