@@ -242,9 +242,13 @@
                                 <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Initiative Progress</span>
                                 <h3 class="text-2xl font-bold mt-1 text-slate-900 dark:text-white" id="stat-progress-txt">0%</h3>
                             </div>
-                            <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/50 flex items-center justify-center text-brand-600 dark:text-brand-400">
-                                <i data-lucide="pie-chart" class="w-5 h-5"></i>
-                            </div>
+                            <button onclick="toggleKpiFormula('kpi-progress-formula')" title="View formula" class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/50 flex items-center justify-center text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-colors cursor-pointer">
+                                <i data-lucide="info" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <div id="kpi-progress-formula" class="hidden mt-2 p-2 rounded-lg bg-brand-50 dark:bg-brand-950/40 border border-brand-100 dark:border-brand-900 text-[10px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            <strong class="text-brand-700 dark:text-brand-400">Formula:</strong> Weighted average across all non-cancelled features<br>
+                            ✅ Done = 100 pts &nbsp;·&nbsp; 🔄 In Progress = 50 pts &nbsp;·&nbsp; ⏳ Others = 0 pts
                         </div>
                         <div class="mt-3 flex items-center gap-3">
                             <svg id="stat-pie-chart" width="52" height="52" viewBox="0 0 36 36" class="flex-shrink-0" style="transform:rotate(-90deg)">
@@ -264,9 +268,13 @@
                                 <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Planning Index</span>
                                 <h3 class="text-2xl font-bold mt-1 text-slate-900 dark:text-white" id="stat-planning-index">—</h3>
                             </div>
-                            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                                <i data-lucide="calendar-check-2" class="w-5 h-5"></i>
-                            </div>
+                            <button onclick="toggleKpiFormula('kpi-planning-formula')" title="View formula" class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer">
+                                <i data-lucide="info" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <div id="kpi-planning-formula" class="hidden mt-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-[10px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            <strong class="text-emerald-700 dark:text-emerald-400">Formula:</strong> Weighted average of FinishDate coverage across non-cancelled features<br>
+                            📅 Future FinishDate = 100 pts &nbsp;·&nbsp; ⚠️ Past FinishDate = 50 pts &nbsp;·&nbsp; ❌ No FinishDate = 0 pts
                         </div>
                         <div class="mt-3 space-y-1.5 text-[10px] text-slate-500 dark:text-slate-400" id="stat-planning-breakdown">
                             <!-- Filled by JS -->
@@ -2248,6 +2256,11 @@
         function escAttr(s) {
             return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
+        // Toggle the formula explanation panel inside a KPI card
+        function toggleKpiFormula(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('hidden');
+        }
         // Copy fix-prompt text to clipboard; button briefly shows "Copied!"
         function copyFixPrompt(btn) {
             const text = btn.getAttribute('data-prompt') || '';
@@ -2261,12 +2274,22 @@
         function collectGeneralInsights(data) {
             const rows = [];
             const DOC_LABELS = { requirements: 'Requirements (PRD)', techSolution: 'Tech Solution', architecture: 'Architecture' };
+            const DOC_FIELD_HINT = {
+                requirements: 'the Requirements / PRD document field',
+                techSolution: 'the Tech Solution document field',
+                architecture: 'the Architecture document field',
+            };
 
             function missingDocs(readiness) {
                 if (!readiness || typeof readiness !== 'object') return [];
                 return Object.keys(DOC_LABELS)
                     .filter(k => !readiness[k] || readiness[k].status !== 'ok')
                     .map(k => DOC_LABELS[k]);
+            }
+            function missingDocKeys(readiness) {
+                if (!readiness || typeof readiness !== 'object') return [];
+                return Object.keys(DOC_LABELS)
+                    .filter(k => !readiness[k] || readiness[k].status !== 'ok');
             }
             function extractKey(name) {
                 const m = (name || '').match(/\(([A-Z]+-\d+)\)\s*$/);
@@ -2275,9 +2298,16 @@
             function cleanName(name) {
                 return (name || '').replace(/^Master-Feature:\s*/i, '').replace(/\s*\([A-Z]+-\d+\)\s*$/, '').trim();
             }
+            function buildDocFixPrompt(jiraKey, missingKeys, itemLabel) {
+                const lines = missingKeys.map(k =>
+                    `  • ${DOC_LABELS[k]}: create or locate the Confluence page, then call jira_create_remote_issue_link with issueKey="${jiraKey || itemLabel}", url="<confluence-page-url>", title="${DOC_LABELS[k]}"`
+                ).join('\n');
+                return `Missing documentation for ${itemLabel || jiraKey}. To add each missing document:\n${lines}\n\nAlternatively, paste the link into the issue description under a "Documents" section using jira_update_issue (field: description).`;
+            }
 
             // 1. Initiative-level missing documentation
             const initMissing = missingDocs(data.readiness);
+            const initMissingKeys = missingDocKeys(data.readiness);
             if (initMissing.length > 0) {
                 const initKey = currentInitiativeKey || null;
                 const initUrl = JIRA_BASE_URL && initKey ? JIRA_BASE_URL + initKey : null;
@@ -2285,9 +2315,9 @@
                     itemName: data.title || 'Initiative',
                     itemKey: initKey,
                     itemUrl: initUrl,
-                    insight: `Initiative missing documentation: ${initMissing.join(', ')}`,
-                    suggestedAction: 'Create and link the missing documents in Jira to ensure requirements and design are tracked',
-                    fixPrompt: `Update Jira issue ${initKey || 'the initiative'}: add or link the missing documents (${initMissing.join(', ')}) to the appropriate document fields.`,
+                    insight: `Missing documentation: ${initMissing.join(', ')}`,
+                    suggestedAction: `Create the missing document(s) in Confluence and add the link to ${initKey || 'the initiative'} in Jira`,
+                    fixPrompt: buildDocFixPrompt(initKey, initMissingKeys, data.title || 'initiative'),
                     severity: 'warning',
                 });
             }
@@ -2296,6 +2326,7 @@
             (data.masterFeatures || []).forEach(mf => {
                 if (isCancelled(mf.status)) return;
                 const mfMissing = missingDocs(mf.readiness);
+                const mfMissingKeys = missingDocKeys(mf.readiness);
                 if (mfMissing.length > 0) {
                     const mfKey = extractKey(mf.name);
                     const mfUrl = JIRA_BASE_URL && mfKey ? JIRA_BASE_URL + mfKey : null;
@@ -2303,9 +2334,9 @@
                         itemName: cleanName(mf.name),
                         itemKey: mfKey,
                         itemUrl: mfUrl,
-                        insight: `Master Feature missing documentation: ${mfMissing.join(', ')}`,
-                        suggestedAction: 'Add or link the missing documents for this Master Feature in Jira',
-                        fixPrompt: `Update Jira issue ${mfKey || mf.name}: add or link the missing documents (${mfMissing.join(', ')}) to the Requirements, Tech Solution, or Architecture fields.`,
+                        insight: `Missing documentation: ${mfMissing.join(', ')}`,
+                        suggestedAction: `Create the missing document(s) in Confluence and link to ${mfKey || 'this Master Feature'} in Jira`,
+                        fixPrompt: buildDocFixPrompt(mfKey, mfMissingKeys, cleanName(mf.name)),
                         severity: 'warning',
                     });
                 }
@@ -2322,7 +2353,7 @@
                     itemUrl: initUrl,
                     insight: `Latest Planned PI (${mismatch.piLabel}) ends ${mismatch.daysLate} day${mismatch.daysLate === 1 ? '' : 's'} after the Delivery Target (${data.timelineRange}) \u2014 initiative is Off Track`,
                     suggestedAction: 'Negotiate scope reduction or update the Delivery Target to reflect the new expected end date',
-                    fixPrompt: `Update Jira initiative ${initKey || ''}: the latest Planned PI (${mismatch.piLabel}) exceeds the Delivery Target (${data.timelineRange}) by ${mismatch.daysLate} days. Either update the Delivery Target field (customfield_22933) to a later date, or work with the PM to reduce scope and bring all features within the current target.`,
+                    fixPrompt: `Initiative ${initKey || ''} is off track: latest Planned PI (${mismatch.piLabel}) exceeds Delivery Target (${data.timelineRange}) by ${mismatch.daysLate} days.\n\nOption A – Update Delivery Target:\n  jira_update_issue: issueKey="${initKey}", fields={customfield_22933: "<new-target-date>"}\n\nOption B – Reduce scope by moving features to a later PI:\n  For each feature extending beyond target, call jira_update_issue with the PlannedPI field (customfield_14422) updated to an earlier quarter, or discuss de-scoping with the PM.`,
                     severity: 'critical',
                 });
             }
@@ -2450,97 +2481,6 @@
             elContainer.innerHTML = html;
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
-        function renderInsightsDetail(featureRows) {
-            if (featureRows.length === 0) {
-                elInsightsDetailContainer.innerHTML = `<p class="text-slate-300 dark:text-slate-700 italic text-xs text-center font-mono py-8">No issues detected \u2014 all features appear to be on track.</p>`;
-                return;
-            }
-
-            // Group rows by master-feature (preserve MF order from data)
-            const byMF = new Map();
-            featureRows.forEach(r => {
-                const key = r.mfKey || r.mfName;
-                if (!byMF.has(key)) byMF.set(key, { mfName: r.mfName, mfKey: r.mfKey, rows: [] });
-                byMF.get(key).rows.push(r);
-            });
-
-            const html = [...byMF.values()].map(mfGroup => {
-                const critCount = mfGroup.rows.filter(r => r.severity === 'critical').length;
-                const warnCount = mfGroup.rows.filter(r => r.severity === 'warning').length;
-                const mfJiraUrl = JIRA_BASE_URL && mfGroup.mfKey ? JIRA_BASE_URL + mfGroup.mfKey : null;
-                const mfCleanName = (mfGroup.mfName || '')
-                    .replace(/^Master-Feature:\s*/i, '')
-                    .replace(/\s*\([A-Z]+-\d+\)\s*$/, '')
-                    .trim();
-
-                const tableRows = mfGroup.rows.map(r => {
-                    const style = INSIGHT_SEVERITY_STYLES[r.severity] || INSIGHT_SEVERITY_STYLES.warning;
-                    const featUrl = JIRA_BASE_URL && r.featureKey ? JIRA_BASE_URL + r.featureKey : null;
-                    return `
-                        <tr class="border-b border-slate-100 dark:border-slate-800/60 last:border-b-0 hover:bg-slate-50/40 dark:hover:bg-slate-800/20 align-top">
-                            <td class="py-2.5 px-3 text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[220px]">
-                                <span class="block leading-snug">${r.featureName}</span>
-                            </td>
-                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
-                                ${featUrl
-                                    ? `<a href="${featUrl}" target="_blank" rel="noopener" class="font-mono text-brand-600 dark:text-brand-400 hover:underline">${r.featureKey}</a>`
-                                    : `<span class="text-slate-400 dark:text-slate-600 font-mono text-[10px]">\u2014</span>`}
-                            </td>
-                            <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-300">
-                                <div class="flex items-start gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0 mt-[3px]"></span>
-                                    <span>${r.insight}</span>
-                                </div>
-                            </td>
-                            <td class="py-2.5 px-3 text-xs text-slate-500 dark:text-slate-400">
-                                <div class="flex flex-col gap-1.5">
-                                    <span>${r.suggestedAction}</span>
-                                    ${r.fixPrompt ? `<button
-                                        data-prompt="${escAttr(r.fixPrompt)}"
-                                        onclick="copyFixPrompt(this)"
-                                        class="self-start text-[9px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-800 hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-all whitespace-nowrap">
-                                        \u{1F916} Copy AI prompt
-                                    </button>` : ''}
-                                </div>
-                            </td>
-                        </tr>`;
-                }).join('');
-
-                return `
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-                    <div class="px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <i data-lucide="layers" class="w-4 h-4 text-brand-500 flex-shrink-0"></i>
-                            ${mfJiraUrl
-                                ? `<a href="${mfJiraUrl}" target="_blank" rel="noopener" class="text-sm font-semibold text-slate-800 dark:text-white hover:underline truncate">${mfCleanName}</a>`
-                                : `<span class="text-sm font-semibold text-slate-800 dark:text-white truncate">${mfCleanName}</span>`}
-                            ${mfGroup.mfKey ? `<span class="font-mono text-xs text-brand-500 dark:text-brand-400 whitespace-nowrap">${mfGroup.mfKey}</span>` : ''}
-                        </div>
-                        <div class="flex items-center gap-1.5 flex-shrink-0">
-                            ${critCount > 0 ? `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">${critCount} Critical</span>` : ''}
-                            ${warnCount > 0 ? `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">${warnCount} Warning</span>` : ''}
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
-                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[220px]">Item Name</th>
-                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[90px]">Jira Key</th>
-                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Insight</th>
-                                    <th class="py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[280px]">Suggested Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>${tableRows}</tbody>
-                        </table>
-                    </div>
-                </div>`;
-            }).join('\n');
-
-            elInsightsDetailContainer.innerHTML = html;
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
-
         // Jump from an Executive Summary insight card to its full item list on the Insights tab
         function viewInsightDetail(groupId) {
             switchTab("insights");
