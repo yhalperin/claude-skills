@@ -91,6 +91,13 @@
                         class="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-slate-700 dark:text-slate-300 font-medium focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none cursor-pointer hidden">
                     </select>
 
+                    <!-- Back-to-overview button — only visible in multi-initiative mode when a detail view is open -->
+                    <button id="back-to-overview-btn" onclick="showOverview()"
+                        class="hidden items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+                        All Initiatives
+                    </button>
+
                     <div class="h-6 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
 
                     <!-- Theme Toggle -->
@@ -180,7 +187,7 @@
                         <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Progress and Planned Timeline (Delivery Target) vs. Actual (latest Planned PI) for every loaded initiative. Click a row to open its dashboard.</p>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full border-collapse text-left text-xs min-w-[820px]">
+                        <table class="w-full border-collapse text-left text-xs min-w-[960px]">
                             <thead>
                                 <tr class="border-b border-slate-200 dark:border-slate-800">
                                     <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Initiative</th>
@@ -189,6 +196,7 @@
                                     <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Planned Timeline</th>
                                     <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Actual (Latest PI)</th>
                                     <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Timeline Sync</th>
+                                    <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400">Readiness</th>
                                     <th class="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400 text-right">Master Features</th>
                                 </tr>
                             </thead>
@@ -572,8 +580,10 @@
             if (!MULTI_INITIATIVE) return;
             elViewOverview.classList.remove("hidden");
             elViewDetail.classList.add("hidden");
-            elBackToOverviewBtn.classList.add("hidden");
-            elBackToOverviewBtn.classList.remove("inline-flex");
+            if (elBackToOverviewBtn) {
+                elBackToOverviewBtn.classList.add("hidden");
+                elBackToOverviewBtn.classList.remove("inline-flex");
+            }
             lucide.createIcons();
         }
 
@@ -586,15 +596,76 @@
             if (elInitiativeSelector) elInitiativeSelector.value = key;
             if (MULTI_INITIATIVE) {
                 elViewOverview.classList.add("hidden");
-                elBackToOverviewBtn.classList.remove("hidden");
-                elBackToOverviewBtn.classList.add("inline-flex");
+                if (elBackToOverviewBtn) {
+                    elBackToOverviewBtn.classList.remove("hidden");
+                    elBackToOverviewBtn.classList.add("inline-flex");
+                }
             }
             elViewDetail.classList.remove("hidden");
             renderDashboard();
         }
 
-        // Builds the Overview KPI row + one summary card per initiative, reusing the same health/off-track logic
-        // as the detail view (computeMasterFeatureHealth, detectTimelineOffTrack) so the two views can never disagree.
+        // Builds the compact readiness cell for the overview table — same emerald/amber scheme as the
+        // individual initiative panel, with clickable ↗ links for documents that have a URL.
+        function readinessCellHtml(readiness) {
+            const docs = [
+                { key: 'requirements', label: 'PRD',  icon: 'file-text' },
+                { key: 'techSolution', label: 'Tech', icon: 'cpu' },
+                { key: 'architecture', label: 'Arch', icon: 'layers' },
+            ];
+            if (!readiness || typeof readiness !== 'object') {
+                return docs.map(d =>
+                    `<span class="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0"></span>${d.label}
+                    </span>`
+                ).join('<span class="text-slate-200 dark:text-slate-700 px-0.5">·</span>');
+            }
+            return docs.map(d => {
+                const doc = readiness[d.key];
+                const ok = doc && doc.status === 'ok';
+                const dotCls  = ok ? 'bg-emerald-400' : 'bg-amber-400 dark:bg-amber-500';
+                const textCls = ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-500';
+                const linkHtml = ok && doc.link
+                    ? `<a href="${doc.link}" target="_blank" onclick="event.stopPropagation()" class="ml-0.5 text-brand-500 hover:underline leading-none" title="Open ${d.label} document">↗</a>`
+                    : '';
+                return `<span class="inline-flex items-center gap-1 text-[10px] font-medium ${textCls}"><span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotCls}"></span>${d.label}${linkHtml}</span>`;
+            }).join('<span class="text-slate-200 dark:text-slate-700 px-0.5">·</span>');
+        }
+
+        // Maps a Jira status string to a colour-tone object for the overview status badge.
+        function jiraStatusTone(jiraStatus) {
+            const s = (jiraStatus || "").toLowerCase();
+            if (s === "done" || s === "completed" || s === "closed") {
+                return { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60" };
+            }
+            if (s === "blocked") {
+                return { dot: "bg-rose-500", text: "text-rose-700 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60" };
+            }
+            if (s === "in progress" || s === "in-progress") {
+                return { dot: "bg-blue-500", text: "text-blue-700 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60" };
+            }
+            return { dot: "bg-slate-400", text: "text-slate-600 dark:text-slate-400", bg: "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700" };
+        }
+
+        // Computes the same weighted Initiative Progress used by the single-initiative board:
+        // Done = 100 pts, In Progress = 50 pts, all others = 0 pts; divided by total active features.
+        function computeInitiativeProgress(masterFeatures) {
+            let total = 0, score = 0;
+            (masterFeatures || []).forEach(mf => {
+                if (isCancelled(mf.status)) return;
+                (mf.features || []).forEach(f => {
+                    if (isCancelled(f.status)) return;
+                    total++;
+                    if (f.status === "Completed") score += 100;
+                    else if (f.status === "In Progress") score += 50;
+                });
+            });
+            return total > 0 ? Math.round(score / total) : 0;
+        }
+
+        // Builds the Overview KPI row + one summary card per initiative.
+        // Progress uses the same weighted formula as the single-initiative board (Done=100%, In-Progress=50%).
+        // Status shows the raw Jira status; off-track detection still drives the Timeline Variance column.
         function renderOverview() {
             if (!MULTI_INITIATIVE) return;
             const today = new Date();
@@ -602,38 +673,43 @@
 
             let totalFeaturesAll = 0;
             let completedFeaturesAll = 0;
+            let weightedScoreAll = 0;
             let attentionCount = 0;
 
             const rowsHtml = keys.map(key => {
                 const data = INITIATIVE_DATA[key];
                 const featuresStats = getFeaturesCompletionMetrics(data.masterFeatures);
-                const pct = featuresStats.total > 0 ? Math.round((featuresStats.completed / featuresStats.total) * 100) : 0;
+                // Weighted progress — matches the single-initiative board exactly
+                const pct = computeInitiativeProgress(data.masterFeatures);
                 totalFeaturesAll += featuresStats.total;
                 completedFeaturesAll += featuresStats.completed;
+                // Accumulate weighted score for the combined-progress KPI
+                (data.masterFeatures || []).forEach(mf => {
+                    if (isCancelled(mf.status)) return;
+                    (mf.features || []).forEach(f => {
+                        if (isCancelled(f.status)) return;
+                        if (f.status === "Completed") weightedScoreAll += 100;
+                        else if (f.status === "In Progress") weightedScoreAll += 50;
+                    });
+                });
 
-                // Planned Timeline (Jira Delivery Target) vs. Actual (latest Planned PI), and the reconciled overall
-                // status - same computeEffectiveInitiativeStatus() the detail view's header badge uses, so an
-                // initiative can never show "On Track" here while its timeline is provably off track, and the
-                // red/orange severity always matches (more than a full Planned PI late = red, less = orange).
-                const effectiveStatus = computeEffectiveInitiativeStatus(data);
-                const offTrack = effectiveStatus.offTrack;
-                const variance = offTrack ? "Off Track" : data.stats.timelineVariance;
+                // Jira status directly (no computed override)
+                const jiraStatus = data.jiraStatus || data.status || "In Progress";
+                const statusTone = jiraStatusTone(jiraStatus);
+
+                // Off-track detection drives the Timeline Variance column only
+                const offTrack = detectTimelineOffTrack(data);
+                const variance = offTrack ? "Off Track" : (data.stats.timelineVariance || "—");
                 const varianceColor = offTrack ? offTrackSeverityColor(offTrack.daysLate) : (/risk|delay|stalling/i.test(variance) ? "rose" : "emerald");
 
-                // Worst rolled-up Health across every Master-Feature, exactly like each MF's own badge.
+                // Worst rolled-up Health across every Master-Feature
                 let worst = "good";
                 data.masterFeatures.forEach(mf => {
                     worst = worseHealth(worst, computeMasterFeatureHealth(mf, today).level);
                 });
 
-                const needsAttention = effectiveStatus.statusColor !== "emerald" || worst !== "good";
+                const needsAttention = !!offTrack || worst !== "good";
                 if (needsAttention) attentionCount++;
-
-                const statusTone = effectiveStatus.statusColor === "rose"
-                    ? { dot: "bg-rose-500", text: "text-rose-700 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60" }
-                    : effectiveStatus.statusColor === "amber"
-                    ? { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60" }
-                    : { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60" };
 
                 const varianceClass = varianceColor === "rose" ? "text-rose-500 dark:text-rose-400" : varianceColor === "amber" ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
                 const varianceIcon = varianceColor === "emerald" ? "check-circle-2" : "alert-triangle";
@@ -643,11 +719,16 @@
                 return `
                     <tr onclick="openInitiativeDetail('${key}')" class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
                         <td class="py-3.5 px-4 max-w-[320px]">
-                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">${linkifyJiraKeys(data.title)}</span>
+                            <div class="flex flex-col gap-0.5">
+                                <span class="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors leading-snug">${data.title}</span>
+                                ${JIRA_BASE_URL && data.jiraKey
+                                    ? `<a href="${JIRA_BASE_URL}${data.jiraKey}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 text-[10px] font-mono font-semibold text-brand-500 dark:text-brand-400 hover:underline w-fit">${data.jiraKey} <svg xmlns='http://www.w3.org/2000/svg' class='inline w-2.5 h-2.5 opacity-60' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/><polyline points='15 3 21 3 21 9'/><line x1='10' y1='14' x2='21' y2='3'/></svg></a>`
+                                    : `<span class="text-[10px] font-mono text-slate-400">${data.jiraKey || key}</span>`}
+                            </div>
                         </td>
                         <td class="py-3.5 px-4">
                             <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${statusTone.bg} ${statusTone.text}">
-                                <span class="w-1.5 h-1.5 rounded-full ${statusTone.dot}"></span>${effectiveStatus.status}
+                                <span class="w-1.5 h-1.5 rounded-full ${statusTone.dot}"></span>${jiraStatus}
                             </span>
                         </td>
                         <td class="py-3.5 px-4 w-[220px]">
@@ -655,7 +736,7 @@
                                 <div class="w-24 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden flex-shrink-0">
                                     <div class="bg-brand-500 h-1.5 rounded-full" style="width: ${pct}%;"></div>
                                 </div>
-                                <span class="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">${pct}% &middot; ${featuresStats.completed}/${featuresStats.total}</span>
+                                <span class="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">${pct}% &middot; ${featuresStats.completed}/${featuresStats.total} done</span>
                             </div>
                         </td>
                         <td class="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">${data.timelineRange}</td>
@@ -665,6 +746,9 @@
                                 <i data-lucide="${varianceIcon}" class="w-3 h-3"></i>${variance}
                             </span>
                         </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <div class="flex items-center gap-1.5 flex-wrap">${readinessCellHtml(data.readiness)}</div>
+                        </td>
                         <td class="py-3.5 px-4 text-right text-slate-400 whitespace-nowrap">${mfCount} MF${mfCount === 1 ? '' : 's'}</td>
                     </tr>
                 `;
@@ -672,7 +756,8 @@
 
             elOverviewGrid.innerHTML = rowsHtml;
 
-            const overallPct = totalFeaturesAll > 0 ? Math.round((completedFeaturesAll / totalFeaturesAll) * 100) : 0;
+            // Combined progress KPI — also uses weighted formula for consistency
+            const overallPct = totalFeaturesAll > 0 ? Math.round(weightedScoreAll / totalFeaturesAll) : 0;
             document.getElementById("overview-initiative-count").innerText = keys.length;
             document.getElementById("overview-overall-progress").innerText = `${overallPct}%`;
             document.getElementById("overview-overall-progress-bar").style.width = `${overallPct}%`;
