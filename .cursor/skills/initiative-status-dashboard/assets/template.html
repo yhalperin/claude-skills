@@ -1644,6 +1644,12 @@
                 todayPct >= 0 && todayPct <= 100
                     ? `<div style="position:absolute;top:0;bottom:0;left:${todayPct.toFixed(2)}%;width:2px;background:${pal.todayLine};opacity:${opacity};border-radius:1px;z-index:2"></div>`
                     : '';
+            // Today line variant with a "Today" label — used once in the header row
+            const todayLineLabeled = todayPct >= 0 && todayPct <= 100
+                ? `<div style="position:absolute;top:0;bottom:0;left:${todayPct.toFixed(2)}%;width:2px;background:${pal.todayLine};opacity:0.95;border-radius:1px;z-index:3">
+                       <span style="position:absolute;top:3px;left:4px;background:${pal.todayLine};color:#fff;font-size:7px;font-weight:800;padding:1px 5px;border-radius:3px;white-space:nowrap;letter-spacing:.05em;line-height:14px">Today</span>
+                   </div>`
+                : '';
 
             // ── Quarter header row ──────────────────────────────────────────────
             let html = `
@@ -1658,7 +1664,7 @@
                     <span style="font-size:10px;font-weight:800;color:${pal.qHeaderText};letter-spacing:.04em">${q}</span>
                 </div>`;
             });
-            html += `</div></div>`;
+            html += `${todayLineLabeled}</div></div>`;
 
             // ── MF and feature rows ─────────────────────────────────────────────
             let rowIdx = 0;
@@ -1683,7 +1689,10 @@
                     return (f.startDate && f.finishDate) || (isDoneF(f) && f.finishDate);
                 });
 
-                if (datedFeats.length === 0 && undatedFeats.length === 0) return;
+                if (datedFeats.length === 0 && undatedFeats.length === 0 && mf.features.length > 0) return;
+
+                // MFs with zero features always rendered — shown as "No Themes" block
+                const hasNoThemes = mf.features.length === 0;
 
                 // MF summary bar
                 let mfBarHtml = '';
@@ -1693,7 +1702,7 @@
                     const barL = toPct(mfMinT).toFixed(2);
                     const barW = Math.max(0.5, toPct(mfMaxT) - toPct(mfMinT)).toFixed(2);
                     mfBarHtml = `<div style="position:absolute;left:${barL}%;width:${barW}%;top:50%;transform:translateY(-50%);height:14px;background:${pal.mfBarBg};border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:1">
-                        <span style="font-size:9px;font-weight:700;color:${pal.mfBarText};padding:0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${mf.progress}% &middot; ${mf.status}</span>
+                        <span style="font-size:9px;font-weight:700;color:${pal.mfBarText};padding:0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${mf.progress}% &middot; ${mf.jiraStatus || mf.status}</span>
                     </div>`;
                 }
 
@@ -1728,12 +1737,19 @@
                     const bW = Math.max(0.3, toPct(new Date(f.finishDate).getTime()) - parseFloat(bL)).toFixed(2);
                     const barOpacity = done ? '0.55' : '0.9';
                     const barPrefix  = done ? '✓ ' : '';
+                    // Explicit Jira key badge for the Theme
+                    const fKeyM = (f.name || '').match(/\(([A-Z][A-Z0-9]*-\d+)\)\s*$/);
+                    const fKey  = fKeyM ? fKeyM[1] : null;
+                    const fKeyBadge = fKey && JIRA_BASE_URL
+                        ? `<a href="${JIRA_BASE_URL}${fKey}" target="_blank" onclick="event.stopPropagation()" style="font-size:9px;font-family:monospace;font-weight:700;color:#3b82f6;text-decoration:none;opacity:0.85;display:inline-block;margin-top:1px">${fKey}&nbsp;&#8599;</a>`
+                        : (fKey ? `<span style="font-size:9px;font-family:monospace;color:#94a3b8">${fKey}</span>` : '');
 
                     html += `<div style="display:flex;align-items:flex-start;padding:4px 0;background:${fRowBg}">
                         <div style="width:${LW}px;flex-shrink:0;padding-left:20px;padding-right:10px;overflow:hidden;display:flex;align-items:flex-start;gap:6px">
                             <span style="width:7px;height:7px;border-radius:50%;background:${hex};flex-shrink:0;margin-top:3px"></span>
                             <div style="flex:1;min-width:0">
                                 <span style="font-size:10px;color:${pal.featText};line-height:1.35;word-break:break-word;display:block">${linkifyJiraKeys(f.name)}</span>
+                                ${fKeyBadge ? `<div>${fKeyBadge}</div>` : ''}
                                 <div style="margin-top:2px">${healthBadgeHtml(fHealth)}</div>
                             </div>
                         </div>
@@ -1773,6 +1789,15 @@
                         </div>`;
                         rowIdx++;
                     });
+                }
+
+                // "No Themes" block for MFs with zero features
+                if (hasNoThemes) {
+                    html += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0 2px;padding-left:${LW}px">
+                        <div style="flex:1;height:1px;background:${pal.unplannedHdrBorder}"></div>
+                        <span style="font-size:9px;font-weight:700;color:${pal.unplannedHdrText};text-transform:uppercase;letter-spacing:.04em;background:${pal.unplannedHdrBg};padding:1px 8px;border-radius:4px;border:1px solid ${pal.unplannedHdrBorder};white-space:nowrap">&#9888; No Themes assigned</span>
+                        <div style="flex:1;height:1px;background:${pal.unplannedHdrBorder}"></div>
+                    </div>`;
                 }
 
                 // Separator between MF groups
@@ -2373,6 +2398,21 @@
                             'warning');
                     }
                 });
+
+                // MF-level: MF has no child themes at all — planning required
+                if (mf.features.length === 0) {
+                    const mfKey = extractKey(mf.name) || mf.name;
+                    rows.push({
+                        mfName: mf.name,
+                        mfKey: extractKey(mf.name),
+                        featureName: '— Master Feature scope —',
+                        featureKey: extractKey(mf.name),
+                        insight: 'No Themes (child features) exist under this Master Feature \u2014 delivery scope is undefined',
+                        suggestedAction: 'Create child Theme issues in Jira under this Master Feature to break down the delivery scope',
+                        fixPrompt: `Master Feature ${mfKey} has no child Theme issues. To add planning scope:\n  1. Create one or more child issues under ${extractKey(mf.name)||mfKey} using jira_create_issue, with:\n     - issuetype: "Theme" (or the appropriate child type for this project)\n     - parent: "${extractKey(mf.name)||mfKey}"\n     - summary: short description of each work track\n     - customfield_14422 (Planned PI): target delivery quarter\n     - customfield_21220 (Start Date) and customfield_21221 (Finish Date)\n  2. Assign each Theme to the relevant Group field (customfield_22029)\n  Coordinate with the PM and tech lead to define the scope before creating issues.`,
+                        severity: 'warning'
+                    });
+                }
 
                 // MF-level: all non-cancelled features are Done but the MF itself is still open
                 const activeFeat = mf.features.filter(f => !isCancelled(f.status));
