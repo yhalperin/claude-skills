@@ -1446,7 +1446,8 @@
         // Date-aware health for a feature using actual StartDate / FinishDate
         function ganttFeatureHealth(f, today) {
             if (isCancelled(f.status)) return { level: 'cancelled', reasons: [] };
-            if (f.status === 'Completed') return { level: 'good', reasons: [] };
+            const doneLabels = ['done','closed','resolved','completed'];
+            if (doneLabels.includes((f.jiraStatus||'').toLowerCase()) || f.status === 'Completed') return { level: 'good', reasons: [] };
             if (!f.finishDate) {
                 return { level: 'warning', reasons: [{ level: 'warning', text: 'No Finish Date assigned — delivery timeline undefined' }] };
             }
@@ -1527,10 +1528,18 @@
             });
 
             // Determine which quarters to show
+            // isDoneF: true when a feature is already delivered (Done / Closed / Resolved / Completed)
+            function isDoneF(f) {
+                return f.status === 'Completed' ||
+                    ['done','closed','resolved'].includes((f.jiraStatus||'').toLowerCase());
+            }
             let featMinT = Infinity, featMaxT = -Infinity;
             activeMFs.forEach(mf => mf.features.forEach(f => {
-                if (isCancelled(f.status) || !f.startDate || !f.finishDate) return;
-                featMinT = Math.min(featMinT, new Date(f.startDate).getTime());
+                if (isCancelled(f.status) || !f.finishDate) return;
+                // Done features: use finishDate as effective start if startDate is absent
+                const effStart = f.startDate || (isDoneF(f) ? f.finishDate : null);
+                if (!effStart) return;
+                featMinT = Math.min(featMinT, new Date(effStart).getTime());
                 featMaxT = Math.max(featMaxT, new Date(f.finishDate).getTime());
             }));
 
@@ -1546,6 +1555,24 @@
                     && qd.end.getTime() >= featMinT
                     && qd.start.getTime() <= featMaxT;
             });
+
+            // If Done features fall outside the PI-calendar range, add synthetic
+            // boundary segments so the Gantt timeline still covers them.
+            if (visQ.length > 0 && isFinite(featMinT) && isFinite(featMaxT)) {
+                const firstQStartT = qMap[visQ[0]].start?.getTime() ?? Infinity;
+                const lastQEndT    = qMap[visQ[visQ.length - 1]].end?.getTime() ?? -Infinity;
+                if (featMinT < firstQStartT) {
+                    const k = '← Past';
+                    qMap[k] = { start: new Date(featMinT - 86400000), end: new Date(firstQStartT - 86400000) };
+                    visQ.unshift(k);
+                }
+                if (featMaxT > lastQEndT) {
+                    const k = 'Future →';
+                    qMap[k] = { start: new Date(lastQEndT + 86400000), end: new Date(featMaxT + 86400000) };
+                    visQ.push(k);
+                }
+            }
+
             const N = visQ.length;
 
             // ── Equal-width quarter mapping ─────────────────────────────────────
@@ -1639,15 +1666,21 @@
             activeMFs.forEach((mf, mfI) => {
                 if (ganttActiveMFs.size > 0 && !ganttActiveMFs.has(mfI)) return;
 
-                const datedFeats   = mf.features.filter(f => !isCancelled(f.status) && f.startDate && f.finishDate);
+                // Done features are shown even if only finishDate is available
+                const datedFeats = mf.features.filter(f =>
+                    !isCancelled(f.status) &&
+                    ((f.startDate && f.finishDate) || (isDoneF(f) && f.finishDate))
+                );
+                // Unplanned = non-done, non-cancelled features missing at least one date
                 const undatedFeats = mf.features.filter(f =>
-                    !isCancelled(f.status) && (!f.startDate || !f.finishDate) &&
+                    !isCancelled(f.status) && !isDoneF(f) &&
+                    (!f.startDate || !f.finishDate) &&
                     (ganttActiveGroups.size === 0 || ganttActiveGroups.has(f.group))
                 );
                 const visFeats = mf.features.filter(f => {
                     if (isCancelled(f.status)) return false;
                     if (ganttActiveGroups.size > 0 && !ganttActiveGroups.has(f.group)) return false;
-                    return f.startDate && f.finishDate;
+                    return (f.startDate && f.finishDate) || (isDoneF(f) && f.finishDate);
                 });
 
                 if (datedFeats.length === 0 && undatedFeats.length === 0) return;
@@ -1655,7 +1688,7 @@
                 // MF summary bar
                 let mfBarHtml = '';
                 if (datedFeats.length > 0) {
-                    const mfMinT = Math.min(...datedFeats.map(f => new Date(f.startDate).getTime()));
+                    const mfMinT = Math.min(...datedFeats.map(f => new Date(f.startDate || f.finishDate).getTime()));
                     const mfMaxT = Math.max(...datedFeats.map(f => new Date(f.finishDate).getTime()));
                     const barL = toPct(mfMinT).toFixed(2);
                     const barW = Math.max(0.5, toPct(mfMaxT) - toPct(mfMinT)).toFixed(2);
@@ -1686,8 +1719,15 @@
                     const hex    = ganttGroupHex(f.group, allGroups);
                     const fHealth = ganttFeatureHealth(f, today);
                     const fRowBg  = rowIdx % 2 === 0 ? pal.featRowEven : pal.featRowOdd;
-                    const bL = toPct(new Date(f.startDate).getTime()).toFixed(2);
+                    const done = isDoneF(f);
+                    // Done features without startDate get a 7-day visual bar ending at finishDate
+                    const effStartMs = f.startDate
+                        ? new Date(f.startDate).getTime()
+                        : new Date(f.finishDate).getTime() - 7 * 86400000;
+                    const bL = toPct(effStartMs).toFixed(2);
                     const bW = Math.max(0.3, toPct(new Date(f.finishDate).getTime()) - parseFloat(bL)).toFixed(2);
+                    const barOpacity = done ? '0.55' : '0.9';
+                    const barPrefix  = done ? '✓ ' : '';
 
                     html += `<div style="display:flex;align-items:flex-start;padding:4px 0;background:${fRowBg}">
                         <div style="width:${LW}px;flex-shrink:0;padding-left:20px;padding-right:10px;overflow:hidden;display:flex;align-items:flex-start;gap:6px">
@@ -1700,8 +1740,8 @@
                         <div style="flex:1;position:relative;min-height:28px">
                             ${piQBands()}
                             ${quarterDividers()}
-                            <div style="position:absolute;left:${bL}%;width:${bW}%;top:50%;transform:translateY(-50%);height:18px;background:${hex};border-radius:4px;opacity:0.9;display:flex;align-items:center;overflow:hidden;z-index:1" title="${f.name} | ${f.group||''} | ${f.startDate} \u2192 ${f.finishDate}">
-                                <span style="font-size:9px;color:#fff;font-weight:700;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.progress}% &middot; ${f.jiraStatus||f.status}</span>
+                            <div style="position:absolute;left:${bL}%;width:${bW}%;top:50%;transform:translateY(-50%);height:18px;background:${hex};border-radius:4px;opacity:${barOpacity};display:flex;align-items:center;overflow:hidden;z-index:1" title="${f.name} | ${f.group||''} | ${f.startDate||'?'} \u2192 ${f.finishDate}">
+                                <span style="font-size:9px;color:#fff;font-weight:700;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${barPrefix}${f.progress}% &middot; ${f.jiraStatus||f.status}</span>
                             </div>
                             ${todayLine('0.5')}
                         </div>
@@ -2239,7 +2279,8 @@
                 if (isCancelled(mf.status)) return;
                 mf.features.forEach(f => {
                     if (isCancelled(f.status)) return;
-                    const notDone = f.status !== 'Completed';
+                    const notDone = f.status !== 'Completed' &&
+                        !['done','closed','resolved'].includes((f.jiraStatus||'').toLowerCase());
                     const fKey = extractKey(f.name) || f.name;
 
                     // 1. No Planned PI
@@ -2332,6 +2373,30 @@
                             'warning');
                     }
                 });
+
+                // MF-level: all non-cancelled features are Done but the MF itself is still open
+                const activeFeat = mf.features.filter(f => !isCancelled(f.status));
+                if (activeFeat.length > 0) {
+                    const allChildrenDone = activeFeat.every(f =>
+                        f.status === 'Completed' ||
+                        ['done','closed','resolved'].includes((f.jiraStatus||'').toLowerCase())
+                    );
+                    const mfIsDone = mf.status === 'Completed' ||
+                        ['done','closed','resolved'].includes((mf.jiraStatus||'').toLowerCase());
+                    if (allChildrenDone && !mfIsDone) {
+                        const mfKey = extractKey(mf.name) || mf.name;
+                        rows.push({
+                            mfName: mf.name,
+                            mfKey: extractKey(mf.name),
+                            featureName: '— Master Feature status —',
+                            featureKey: extractKey(mf.name),
+                            insight: `All ${activeFeat.length} feature${activeFeat.length===1?'':'s'} are Done, but the Master Feature is still "${mf.jiraStatus||mf.status}" \u2014 needs closure`,
+                            suggestedAction: 'Transition the Master Feature to Done/Closed in Jira to accurately reflect the completed delivery',
+                            fixPrompt: `Master Feature ${mfKey} is still "${mf.jiraStatus||mf.status}" but all ${activeFeat.length} child feature${activeFeat.length===1?'':'s'} are Done.\nAction \u2014 transition to Done/Closed:\n  1. Call jira_get_transitions with issueKey="${extractKey(mf.name)||mfKey}" to list available transitions\n  2. Call jira_transition_issue with issueKey="${extractKey(mf.name)||mfKey}" and the transitionId matching "Done" or "Closed"\n  Optionally add a closure comment: jira_add_comment issueKey="${extractKey(mf.name)||mfKey}" with a delivery summary.`,
+                            severity: 'warning'
+                        });
+                    }
+                }
             });
 
             return rows;
