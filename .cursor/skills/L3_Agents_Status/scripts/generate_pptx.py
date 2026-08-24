@@ -1,5 +1,5 @@
 """
-L3-Agents Status PPTX Generator  (v2 — health indicators)
+L3-Agents Status PPTX Generator  (v3 — merged BV+Impact, health reason)
 Usage: python generate_pptx.py --data <path-to-data.json>
 
 Input JSON schema:
@@ -14,13 +14,14 @@ Input JSON schema:
       "time_in_status_days": 14,
       "pi":                  "27-Q1",
       "finish_date":         "2026-10-15" | null,
-      "health":              "On Track" | "At Risk" | "Off Track"
+      "health":              "On Track" | "At Risk" | "Off Track",
+      "health_reason":       "short reason or empty string"
     }
   ],
   "output_dir": "C:\\path\\to\\output"
 }
 
-Columns: Agent | Theme | Business Value | Impact | Status (+time) | ETA | Health | Dev Phase removed
+Columns (6): Agent | Theme | Business Value & Impact | Status (+time) | ETA | Health (+reason)
 Output:  <output_dir>/l3-agents-status-YYYY-MM-DD.pptx
 """
 
@@ -40,15 +41,14 @@ from pptx.enum.text import PP_ALIGN
 HEADERS = [
     "Agent (Master Feature)",
     "Theme Name (Jira ID)",
-    "Business Value",
-    "Impact",
+    "Business Value & Impact",
     "Status",
     "ETA",
     "Health",
 ]
 
-# inches; sum = 12.58
-COL_W = [1.90, 2.00, 2.35, 1.90, 1.25, 0.83, 1.35]
+# 6 columns: Agent | Theme | BV+Impact | Status | ETA | Health
+COL_W = [1.90, 2.00, 3.50, 1.30, 0.85, 1.60]
 
 # ── Color palette ─────────────────────────────────────────────────────────────
 
@@ -299,15 +299,28 @@ def add_slide(prs, chunk, slide_num, total_slides, today_str):
 
     # Data rows
     for ri, row in enumerate(chunk):
-        bg_row   = ROW_ALT_BG if ri % 2 == 1 else ROW_BG
-        s_color  = STATUS_COLORS.get(row["status"], DIM_TEXT)
-        health   = row.get("health", "On Track")
-        h_bg     = HEALTH_BG.get(health, ROW_BG)
-        h_txt    = HEALTH_TXT.get(health, DARK_TEXT)
+        bg_row        = ROW_ALT_BG if ri % 2 == 1 else ROW_BG
+        s_color       = STATUS_COLORS.get(row["status"], DIM_TEXT)
+        health        = row.get("health", "On Track")
+        health_reason = row.get("health_reason", "")
+        h_bg          = HEALTH_BG.get(health, ROW_BG)
+        h_txt         = HEALTH_TXT.get(health, DARK_TEXT)
 
         tis_days = row.get("time_in_status_days")
         tis_str  = _format_time_in_status(tis_days)
         eta_str  = _format_eta(row.get("finish_date"))
+
+        # Business Value + Impact merged into one cell
+        bv_lines   = [row["business_value"], row["impact"]]
+        bv_sizes   = [8.5, 7.5]
+        bv_bolds   = [False, False]
+        bv_colors  = [DARK_TEXT, DIM_TEXT]
+
+        # Health label + optional reason
+        h_lines  = [HEALTH_LABELS[health], health_reason] if health_reason else [HEALTH_LABELS[health]]
+        h_sizes  = [8.5, 7.5]
+        h_bolds  = [True, False]
+        h_colors = [h_txt, DIM_TEXT]
 
         # column index → (lines, sizes, bolds, colors, bg_override)
         col_data = [
@@ -315,10 +328,8 @@ def add_slide(prs, chunk, slide_num, total_slides, today_str):
             ([row["agent"]], [8.5], [False], [DIM_TEXT], bg_row),
             # Theme
             ([row["theme"]], [8.5], [True],  [DARK_TEXT], bg_row),
-            # Business Value
-            ([row["business_value"]], [8.5], [False], [DARK_TEXT], bg_row),
-            # Impact
-            ([row["impact"]], [8.5], [False], [DIM_TEXT], bg_row),
+            # Business Value & Impact (merged)
+            (bv_lines, bv_sizes, bv_bolds, bv_colors, bg_row),
             # Status (+ time in status)
             (
                 [row["status"], tis_str] if tis_str else [row["status"]],
@@ -329,8 +340,8 @@ def add_slide(prs, chunk, slide_num, total_slides, today_str):
             ),
             # ETA
             ([eta_str], [8.5], [False], [DARK_TEXT], bg_row),
-            # Health — gets its own background color
-            ([HEALTH_LABELS[health]], [8.5], [True], [h_txt], h_bg),
+            # Health — colored background + optional reason sub-line
+            (h_lines, h_sizes, h_bolds, h_colors, h_bg),
         ]
 
         for ci, (lines, sizes, bolds, colors, bg_ci) in enumerate(col_data):

@@ -66,6 +66,7 @@ def main():
             "pi":            r.get("pi", "—"),
             "eta":           _fmt_eta(r.get("finish_date")),
             "health":        r.get("health", "On Track"),
+            "healthReason":  r.get("health_reason", ""),
             "tone": {
                 "On Track":  "success",
                 "At Risk":   "warning",
@@ -120,6 +121,7 @@ interface RowData {
   pi:            string;
   eta:           string;
   health:        string;
+  healthReason:  string;
   tone:          string;
 }
 
@@ -146,14 +148,17 @@ function StatusCell({ status, timeInStatus }: { status: string; timeInStatus: st
   );
 }
 
-function HealthBadge({ health }: { health: string }) {
+function HealthBadge({ health, reason }: { health: string; reason: string }) {
   const theme = useHostTheme();
   const color =
     health === "On Track"  ? theme.category.green
     : health === "At Risk" ? theme.category.yellow
     :                        theme.category.red;
   return (
-    <Text size="small" weight="semibold" style={{ color }}>{health}</Text>
+    <Stack gap={2}>
+      <Text size="small" weight="semibold" style={{ color }}>{health}</Text>
+      {reason && <Text size="small" tone="tertiary">{reason}</Text>}
+    </Stack>
   );
 }
 
@@ -169,13 +174,12 @@ export default function L3AgentsStatus() {
     .map(r => r.themeMain)
     .join(", ");
 
-  // Exact same 7 columns as the PPTX slides:
-  //   Agent | Theme | Business Value | Impact | Status (+time) | ETA | Health
+  // Exact same 6 columns as the PPTX slides:
+  //   Agent | Theme | Business Value & Impact | Status (+time) | ETA | Health (+reason)
   const tableHeaders = [
     "Agent (Master Feature)",
     "Theme Name (Jira ID)",
-    "Business Value",
-    "Impact",
+    "Business Value & Impact",
     "Status",
     "ETA",
     "Health",
@@ -187,11 +191,13 @@ export default function L3AgentsStatus() {
       <Text size="small" weight="semibold">{r.themeMain}</Text>
       <Text size="small" tone="tertiary">{r.themeId}</Text>
     </Stack>,
-    <Text size="small">{r.businessValue}</Text>,
-    <Text size="small" tone="secondary">{r.impact}</Text>,
+    <Stack gap={2}>
+      <Text size="small">{r.businessValue}</Text>
+      <Text size="small" tone="tertiary">{r.impact}</Text>
+    </Stack>,
     <StatusCell status={r.status} timeInStatus={r.timeInStatus} />,
     <Text size="small">{r.eta}</Text>,
-    <HealthBadge health={r.health} />,
+    <HealthBadge health={r.health} reason={r.healthReason} />,
   ]);
 
   const rowTones = ROWS.map((r: RowData): TableRowTone | undefined =>

@@ -99,24 +99,25 @@ If the PI name is not found in the file, set `pi_end = null`.
 
 ---
 
-## Step 6 — Compute health indicator
+## Step 6 — Compute health indicator and reason
 
-For each theme, evaluate these rules in priority order and return the **first match**:
+For each theme, evaluate these rules in priority order and return the **first match**.
+Also produce a short `health_reason` string (≤ 8 words) for every non-"On Track" result; leave it `""` when health is On Track.
 
-| Priority | Condition | Health |
-|---|---|---|
-| 1 | `status == "Done"` | **On Track** |
-| 2 | `finish_date < today` AND status ≠ Done | **Off Track** |
-| 3 | `finish_date > pi_end` (ETA slips beyond PI deadline) | **Off Track** |
-| 4 | `pi_end` is in the past AND status not in (Done, In Progress) | **Off Track** |
-| 5 | `finish_date` within 14 days of `pi_end` AND status not in (Done, In Progress) | **At Risk** |
-| 6 | `finish_date` is null AND status in (Open, Planned) AND `time_in_status_days > 21` | **At Risk** |
-| 7 | `time_in_status_days > 42` AND status in (Open, Planned, HL Product Discovery) | **At Risk** |
-| 8 | `time_in_status_days > 21` AND status in (Open, HL Product Discovery) | **At Risk** |
-| 9 | `finish_date` is null AND status not in (Done, In Progress) | **At Risk** |
-| 10 | _(none of the above)_ | **On Track** |
+| Priority | Condition | Health | Example reason |
+|---|---|---|---|
+| 1 | `status == "Done"` | **On Track** | `""` |
+| 2 | `finish_date < today` AND status ≠ Done | **Off Track** | `"ETA already past (Oct 10)"` |
+| 3 | `finish_date > pi_end` (ETA slips beyond PI deadline) | **Off Track** | `"ETA Nov 15 slips past PI end"` |
+| 4 | `pi_end` is in the past AND status not in (Done, In Progress) | **Off Track** | `"PI ended, still not In Progress"` |
+| 5 | `finish_date` within 14 days of `pi_end` AND status not in (Done, In Progress) | **At Risk** | `"ETA Nov 3, PI ends Nov 7"` |
+| 6 | `finish_date` is null AND status in (Open, Planned) AND `time_in_status_days > 21` | **At Risk** | `"No ETA, stuck 45d in Planned"` |
+| 7 | `time_in_status_days > 42` AND status in (Open, Planned, HL Product Discovery) | **At Risk** | `"Stuck 60d in HL Product Discovery"` |
+| 8 | `time_in_status_days > 21` AND status in (Open, HL Product Discovery) | **At Risk** | `"Stuck 30d with no ETA"` |
+| 9 | `finish_date` is null AND status not in (Done, In Progress) | **At Risk** | `"No ETA set"` |
+| 10 | _(none of the above)_ | **On Track** | `""` |
 
-`today` = date this skill is run.
+`today` = date this skill is run. Keep reasons concise — they appear as a sub-line in a small table cell.
 
 ---
 
@@ -153,7 +154,8 @@ Create a JSON file at `%TEMP%\l3_agents_data.json` with this structure:
       "time_in_status_days": 14,
       "pi":                  "27-Q1",
       "finish_date":         "2026-10-15",
-      "health":              "On Track"
+      "health":              "On Track",
+      "health_reason":       ""
     }
   ],
   "output_dir": "C:\\Users\\yhalperin\\Documents\\L3_status_presentations"
@@ -166,6 +168,7 @@ Field notes:
 - `finish_date`: ISO date string (`"YYYY-MM-DD"`) or `null`
 - `time_in_status_days`: integer ≥ 0
 - `health`: `"On Track"` | `"At Risk"` | `"Off Track"`
+- `health_reason`: short explanation (≤ 8 words) for non-On Track; empty string `""` when On Track
 - `dev_phase` is NOT included in the payload (removed from slides to make room for Health)
 
 Then run **both generators** (they read the same JSON, so they can run sequentially or in parallel):
