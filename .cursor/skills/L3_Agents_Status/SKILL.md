@@ -6,12 +6,12 @@ description: >-
   create, refresh, or update the L3-Agents status slide deck, wants a progress
   report on L3-Agents themes, or uses phrases like "generate the status",
   "update the slides", "L3 agents progress", "create the presentation", or
-  "refresh the deck". The skill fetches live Jira data, resolves agent names
-  from parent Master Features (cf[11140]), extracts business value and impact
-  from descriptions, sorts rows by status (Done → In Progress → Discovery →
-  Planned → Open), and saves a date-stamped PPTX to the standard output folder.
-  Always use this skill for L3-Agents status slide requests — even if the user
-  just says "make the slides" in context of L3 agents work.
+  "refresh the deck". The skill fetches live Jira data, resolves agent names,
+  computes time-in-status from changelogs, derives a health indicator (On Track /
+  At Risk / Off Track) based on ETA, status, time-in-status and PI timeline, and
+  saves a date-stamped PPTX to the standard output folder. Always use this skill
+  for L3-Agents status slide requests — even if the user just says "make the
+  slides" in context of L3 agents work.
 ---
 
 # L3-Agents Status Slide Generator
@@ -26,15 +26,25 @@ Produces a PPTX status deck for all Jira Themes labeled `L3-Agents` in project I
 |---|---|
 | Planned PI | `customfield_14422` |
 | Parent Link (Master Feature / Agent) | `customfield_11140` |
+| Finish Date (ETA) | `customfield_21221` |
+
+## PI Timeline file
+`C:\Users\yhalperin\source\pi-timeline-fy2027.json`
+
+Contains `fiscalYears[].programIncrements[]` entries, each with `name` (e.g. `"27-Q1"`),
+`start`, `end`, and `phases.execution.end`. Use `phases.execution.end` as the **PI deadline**
+for health calculations.
 
 ---
 
 ## Step 1 — Fetch all L3-Agents themes
 
-Use the `jira_search` tool with:
+Use `jira_search` with:
 - **JQL**: `project = IAI AND issuetype = Theme AND labels = "L3-Agents" ORDER BY key ASC`
-- **fields**: `summary,description,status,customfield_14422,customfield_11140,labels`
+- **fields**: `summary,description,status,customfield_14422,customfield_11140,customfield_21221,labels`
 - **limit**: 50
+
+Collect all returned issue keys (e.g. `["IAI-3982", "IAI-3985", ...]`).
 
 ---
 
@@ -44,113 +54,135 @@ For each theme, read `customfield_11140.value` (the parent issue key):
 - If the value is `IAI-3686` → agent = `"Not mapped yet"`, agentKey = `"IAI-3686"`
 - Otherwise → use `jira_get_issue` to fetch that key's `summary`
 
-Fetch all unique non-`IAI-3686` parent keys in parallel to save time.
+Fetch all unique non-`IAI-3686` parent keys in parallel.
 
 ---
 
-## Step 3 — Extract Business Value and Impact from description
+## Step 3 — Fetch changelogs for time in status
 
-Parse each theme's description looking for these section markers (case-insensitive):
-- **Goal / Business Value** → use as the *Business Value* field
-- **Impact** → use as the *Impact* field
-- **Value** section → split into Business Value (first bullet/sentence) and Impact (second)
+Call `jira_batch_get_changelogs` with all the IAI theme keys from Step 1.
 
-If no structured sections exist, use the first meaningful sentence as Business Value and leave Impact as `"TBD"`.
+For each issue, scan its changelog items for entries where `field == "status"` (or `fieldId == "status"`).
+Find the **most recent** such entry and note its `created` timestamp.
+Compute:
 
-**Summarise to one line each** (≤ 15 words). The slides are compact — long text wraps badly.
+```
+time_in_status_days = (today − created_date).days
+```
 
-Examples of good one-liners:
-- Business Value: `"AI-driven permission recommendations & privilege tagging"`
-- Impact: `"2× privileged entitlement coverage"`
-
----
-
-## Step 4 — Determine Dev Phase
-
-Use this heuristic based on Jira status:
-
-| Jira Status | Dev Phase |
-|---|---|
-| Done | 6 |
-| In Progress | 4 |
-| HL Dev Discovery | 1 |
-| HL Product Discovery | 1 |
-| Planned | 2 |
-| Open | 1 |
-
-The 6 phases are:
-1. Discovery & Research
-2. Data Ingestion
-3. MLOps & Algorithm
-4. Embedded in Product
-5. Conversational Layer
-6. Test & Monitoring
+If no status-change entry exists in the changelog (the issue was never transitioned),
+use the issue's `created` date as the fallback. Cap the display at 999 days.
 
 ---
 
-## Step 5 — Get latest Planned PI
+## Step 4 — Extract Business Value and Impact from description
+
+Parse each theme's description looking for section markers (case-insensitive):
+- **Goal / Business Value** → use as *Business Value*
+- **Impact** → use as *Impact*
+- **Value** section → first bullet/sentence = Business Value, second = Impact
+
+If no structured sections: first meaningful sentence = Business Value, Impact = `"TBD"`.
+
+Keep each to one line (≤ 15 words) — the slides are compact.
+
+---
+
+## Step 5 — Load PI timeline and get PI end dates
+
+Read `C:\Users\yhalperin\source\pi-timeline-fy2027.json`.
+
+For each theme, take the latest Planned PI (see Step 7 below for how to pick it),
+then look it up in the timeline to get `phases.execution.end` as `pi_end`.
+
+If the PI name is not found in the file, set `pi_end = null`.
+
+---
+
+## Step 6 — Compute health indicator
+
+For each theme, evaluate these rules in priority order and return the **first match**:
+
+| Priority | Condition | Health |
+|---|---|---|
+| 1 | `status == "Done"` | **On Track** |
+| 2 | `finish_date < today` AND status ≠ Done | **Off Track** |
+| 3 | `finish_date > pi_end` (ETA slips beyond PI deadline) | **Off Track** |
+| 4 | `pi_end` is in the past AND status not in (Done, In Progress) | **Off Track** |
+| 5 | `finish_date` within 14 days of `pi_end` AND status not in (Done, In Progress) | **At Risk** |
+| 6 | `finish_date` is null AND status in (Open, Planned) AND `time_in_status_days > 21` | **At Risk** |
+| 7 | `time_in_status_days > 42` AND status in (Open, Planned, HL Product Discovery) | **At Risk** |
+| 8 | `time_in_status_days > 21` AND status in (Open, HL Product Discovery) | **At Risk** |
+| 9 | `finish_date` is null AND status not in (Done, In Progress) | **At Risk** |
+| 10 | _(none of the above)_ | **On Track** |
+
+`today` = date this skill is run.
+
+---
+
+## Step 7 — Get latest Planned PI
 
 From `customfield_14422.value` (an array like `["27-Q1", "26-Q2"]`):
-- Parse each as `YY-Qn` where YY = 2-digit year, n = quarter number
+- Parse each as `YY-Qn`
 - Return the one with the highest `year * 10 + quarter` value
-- If the array is empty or missing, use `"—"`
+- If empty/missing → `"—"`
 
 ---
 
-## Step 6 — Sort rows
+## Step 8 — Sort rows
 
-Sort all themes by status in this priority order, then by Jira key ascending within each group:
+Sort by status priority (then by Jira key ascending within each group):
 
-1. Done
-2. In Progress
-3. HL Dev Discovery
-4. HL Product Discovery
-5. Planned
-6. Open
+1. Done  2. In Progress  3. HL Dev Discovery  4. HL Product Discovery  5. Planned  6. Open
 
 ---
 
-## Step 7 — Build the data payload and run the PPTX script
+## Step 9 — Build the data payload and run the PPTX script
 
-Create a JSON file at a temporary path (e.g. `%TEMP%\l3_agents_data.json`) with this structure:
+Create a JSON file at `%TEMP%\l3_agents_data.json` with this structure:
 
 ```json
 {
   "rows": [
     {
-      "agent": "Agent Name (PARENT-KEY)",
-      "theme": "Theme Summary\n(IAI-XXXX)",
-      "business_value": "One-line business value",
-      "impact": "One-line impact",
-      "status": "In Progress",
-      "pi": "27-Q1",
-      "dev_phase": 4
+      "agent":               "Agent Name (PARENT-KEY)",
+      "theme":               "Theme Summary\n(IAI-XXXX)",
+      "business_value":      "One-line business value",
+      "impact":              "One-line impact",
+      "status":              "In Progress",
+      "time_in_status_days": 14,
+      "pi":                  "27-Q1",
+      "finish_date":         "2026-10-15",
+      "health":              "On Track"
     }
   ],
   "output_dir": "C:\\Users\\yhalperin\\Documents\\L3_status_presentations"
 }
 ```
 
-For `agent`:
-- Mapped: `"Agent Name (PARENT-KEY)"` — e.g. `"AI Permission Tagging (IGA-45610)"`
-- Unmapped: `"Not mapped yet"`
+Field notes:
+- `agent`: `"Name (KEY)"` for mapped; `"Not mapped yet"` for unmapped
+- `theme`: summary on first line, `(IAI-XXXX)` on second line
+- `finish_date`: ISO date string (`"YYYY-MM-DD"`) or `null`
+- `time_in_status_days`: integer ≥ 0
+- `health`: `"On Track"` | `"At Risk"` | `"Off Track"`
+- `dev_phase` is NOT included in the payload (removed from slide to make room for Health)
 
-For `theme`: always `"Theme summary\n(IAI-XXXX)"` — the Jira key on a second line.
-
-Then run the bundled PPTX generator, replacing `<skill_dir>` with the directory containing this SKILL.md:
+Then run the bundled PPTX generator, replacing `<skill_dir>` with the directory of this SKILL.md:
 
 ```powershell
 python "<skill_dir>\scripts\generate_pptx.py" --data "%TEMP%\l3_agents_data.json"
 ```
 
-The script prints the full output path on success.
+The script prints the full output path to stdout on success.
 
 ---
 
-## Step 8 — Report to the user
+## Step 10 — Report to the user
 
 Tell the user:
-- The full path to the generated file
-- Number of slides and total rows
-- How many themes are not yet mapped to a Master Feature
-- Any warnings (e.g. themes with no description, missing PI)
+- Full path to the generated PPTX
+- Number of slides and rows
+- Summary of health: how many On Track / At Risk / Off Track
+- Any themes with no finish date or missing PI
+- Any Off Track themes (by name, so they're easy to spot)

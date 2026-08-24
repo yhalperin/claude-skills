@@ -1,55 +1,41 @@
 """
-L3-Agents Status PPTX Generator
+L3-Agents Status PPTX Generator  (v2 — health indicators)
 Usage: python generate_pptx.py --data <path-to-data.json>
 
 Input JSON schema:
 {
   "rows": [
     {
-      "agent":          "Agent Name (KEY)" | "Not mapped yet",
-      "theme":          "Theme Summary\n(IAI-XXXX)",
-      "business_value": "one-line value",
-      "impact":         "one-line impact",
-      "status":         "In Progress" | "Planned" | "Open" | ...,
-      "pi":             "27-Q1",
-      "dev_phase":      1-6
+      "agent":               "Agent Name (KEY)" | "Not mapped yet",
+      "theme":               "Theme Summary\\n(IAI-XXXX)",
+      "business_value":      "one-line value",
+      "impact":              "one-line impact",
+      "status":              "In Progress" | "Planned" | "Open" | ...,
+      "time_in_status_days": 14,
+      "pi":                  "27-Q1",
+      "finish_date":         "2026-10-15" | null,
+      "health":              "On Track" | "At Risk" | "Off Track"
     }
   ],
   "output_dir": "C:\\path\\to\\output"
 }
 
-Output: <output_dir>/l3-agents-status-YYYY-MM-DD.pptx
+Columns: Agent | Theme | Business Value | Impact | Status (+time) | ETA | Health | Dev Phase removed
+Output:  <output_dir>/l3-agents-status-YYYY-MM-DD.pptx
 """
 
 import argparse
 import json
 import os
 import sys
-from datetime import date
+from datetime import date, datetime
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
-# ── Phase definitions ─────────────────────────────────────────────────────────
-
-PHASES = {
-    1: "P1 · Discovery & Research",
-    2: "P2 · Data Ingestion",
-    3: "P3 · MLOps & Algorithm",
-    4: "P4 · Embedded in Product",
-    5: "P5 · Conversational Layer",
-    6: "P6 · Test & Monitoring",
-}
-
-PHASE_LEGEND_SHORT = [
-    "P1 Discovery & Research",
-    "P2 Data Ingestion",
-    "P3 MLOps & Algorithm",
-    "P4 Embedded in Product",
-    "P5 Conversational Layer",
-    "P6 Test & Monitoring",
-]
+# ── Column headers & widths ────────────────────────────────────────────────────
+# Total must ≈ slide_width − 2 × margin = 13.33 − 0.76 = 12.57 inches
 
 HEADERS = [
     "Agent (Master Feature)",
@@ -57,28 +43,28 @@ HEADERS = [
     "Business Value",
     "Impact",
     "Status",
-    "PI",
-    "Dev Phase",
+    "ETA",
+    "Health",
 ]
 
-# Column widths in inches — must sum to ~12.63 (slide width 13.33 − 2×0.35 margins)
-COL_W = [1.95, 2.05, 2.60, 2.10, 1.10, 0.53, 2.30]
+# inches; sum = 12.58
+COL_W = [1.90, 2.00, 2.35, 1.90, 1.25, 0.83, 1.35]
 
 # ── Color palette ─────────────────────────────────────────────────────────────
 
-WHITE         = RGBColor(0xFF, 0xFF, 0xFF)
-SLIDE_BG      = RGBColor(0xFF, 0xFF, 0xFF)
-HEADER_BG     = RGBColor(0x1F, 0x6B, 0xC8)
-HEADER_TXT    = WHITE
-ROW_BG        = WHITE
-ROW_ALT_BG    = RGBColor(0xEB, 0xF3, 0xFB)
-BORDER_COLOR  = RGBColor(0xC0, 0xCC, 0xD8)
-TITLE_COLOR   = RGBColor(0x1A, 0x1A, 0x2E)
-SUBTITLE_CLR  = RGBColor(0x55, 0x55, 0x66)
-DARK_TEXT     = RGBColor(0x1A, 0x1A, 0x1A)
-DIM_TEXT      = RGBColor(0x55, 0x55, 0x66)
+WHITE        = RGBColor(0xFF, 0xFF, 0xFF)
+SLIDE_BG     = RGBColor(0xFF, 0xFF, 0xFF)
+HEADER_BG    = RGBColor(0x1F, 0x6B, 0xC8)
+HEADER_TXT   = WHITE
+ROW_BG       = WHITE
+ROW_ALT_BG   = RGBColor(0xEB, 0xF3, 0xFB)
+BORDER_COLOR = RGBColor(0xC0, 0xCC, 0xD8)
+TITLE_COLOR  = RGBColor(0x1A, 0x1A, 0x2E)
+SUBTITLE_CLR = RGBColor(0x55, 0x55, 0x66)
+DARK_TEXT    = RGBColor(0x1A, 0x1A, 0x1A)
+DIM_TEXT     = RGBColor(0x55, 0x55, 0x66)
 
-# Jira-aligned status colors: In Progress=blue, Planned=green, everything else=gray
+# Jira-aligned status colors
 STATUS_COLORS = {
     "Done":                 RGBColor(0x42, 0x52, 0x6E),
     "In Progress":          RGBColor(0x00, 0x52, 0xCC),
@@ -88,42 +74,58 @@ STATUS_COLORS = {
     "Open":                 RGBColor(0x42, 0x52, 0x6E),
 }
 
-PHASE_COLORS = {
-    1: RGBColor(0x75, 0x75, 0x75),
-    2: RGBColor(0x1F, 0x6B, 0xC8),
-    3: RGBColor(0x7C, 0x5C, 0xBF),
-    4: RGBColor(0x1E, 0x8A, 0x44),
-    5: RGBColor(0x0E, 0x7C, 0x86),
-    6: RGBColor(0xC0, 0x85, 0x32),
+# Health — background fill + text color pairs
+HEALTH_BG = {
+    "On Track":  RGBColor(0xD6, 0xF0, 0xDE),   # light green
+    "At Risk":   RGBColor(0xFF, 0xEE, 0xC2),    # light amber
+    "Off Track": RGBColor(0xFC, 0xD9, 0xD9),    # light red
+}
+HEALTH_TXT = {
+    "On Track":  RGBColor(0x1A, 0x60, 0x35),   # dark green
+    "At Risk":   RGBColor(0x7A, 0x50, 0x00),    # dark amber
+    "Off Track": RGBColor(0x99, 0x1B, 0x1B),    # dark red
+}
+HEALTH_LABELS = {
+    "On Track":  "On Track",
+    "At Risk":   "At Risk",
+    "Off Track": "Off Track",
 }
 
-LEGEND_DOTS = [
+# Status legend for top-right of slide
+STATUS_LEGEND = [
     (RGBColor(0x00, 0x52, 0xCC), "In Progress"),
     (RGBColor(0x21, 0x6E, 0x4E), "Planned"),
     (RGBColor(0x42, 0x52, 0x6E), "Open / Discovery / Other"),
 ]
 
-# ── XML helpers ───────────────────────────────────────────────────────────────
+# Health legend
+HEALTH_LEGEND = [
+    (RGBColor(0x1A, 0x60, 0x35), "On Track"),
+    (RGBColor(0x7A, 0x50, 0x00), "At Risk"),
+    (RGBColor(0x99, 0x1B, 0x1B), "Off Track"),
+]
 
-def set_cell_bg(cell, rgb: RGBColor):
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _set_cell_bg(cell, rgb: RGBColor):
     from pptx.oxml.ns import qn
     from lxml import etree
-    tc = cell._tc
+    tc   = cell._tc
     tcPr = tc.get_or_add_tcPr()
     for tag in ("a:solidFill", "a:noFill", "a:gradFill", "a:pattFill"):
         for el in tcPr.findall(qn(tag)):
             tcPr.remove(el)
-    solidFill = etree.SubElement(tcPr, qn("a:solidFill"))
-    srgbClr   = etree.SubElement(solidFill, qn("a:srgbClr"))
-    srgbClr.set("val", f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}")
+    sf = etree.SubElement(tcPr, qn("a:solidFill"))
+    sc = etree.SubElement(sf, qn("a:srgbClr"))
+    sc.set("val", f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}")
 
 
-def add_cell_border(cell, rgb: RGBColor, width_pt: float = 0.5):
+def _add_cell_border(cell, rgb: RGBColor, width_pt: float = 0.5):
     from pptx.oxml.ns import qn
     from lxml import etree
-    tc = cell._tc
+    tc   = cell._tc
     tcPr = tc.get_or_add_tcPr()
-    w = int(width_pt * 12700)
+    w    = int(width_pt * 12700)
     for tag in ("a:lnL", "a:lnR", "a:lnT", "a:lnB"):
         for el in tcPr.findall(qn(tag)):
             tcPr.remove(el)
@@ -134,37 +136,78 @@ def add_cell_border(cell, rgb: RGBColor, width_pt: float = 0.5):
         sc.set("val", f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}")
 
 
-def set_cell_text(cell, text: str, font_size: float, bold: bool,
-                  color: RGBColor, align=PP_ALIGN.LEFT):
+def _set_cell_text(cell, lines, font_sizes, bolds, colors, align=PP_ALIGN.LEFT):
+    """
+    lines      – list of str (one per paragraph)
+    font_sizes – list of float (pt) or single float
+    bolds      – list of bool or single bool
+    colors     – list of RGBColor or single RGBColor
+    """
+    if isinstance(lines, str):
+        lines = [lines]
+    if not isinstance(font_sizes, list):
+        font_sizes = [font_sizes] * len(lines)
+    if not isinstance(bolds, list):
+        bolds = [bolds] * len(lines)
+    if not isinstance(colors, list):
+        colors = [colors] * len(lines)
+
     tf = cell.text_frame
     tf.word_wrap = True
     tf.clear()
-    for i, line in enumerate(text.split("\n")):
-        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+    for i, (line, fs, bold, color) in enumerate(zip(lines, font_sizes, bolds, colors)):
+        p   = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
         p.alignment = align
         run = p.add_run()
-        run.text = line
-        run.font.size  = Pt(font_size)
-        run.font.bold  = bold
-        run.font.color.rgb = color
+        run.text            = line
+        run.font.size       = Pt(fs)
+        run.font.bold       = bold
+        run.font.color.rgb  = color
 
 
-def add_legend_dot(slide, left, top, size, rgb: RGBColor):
+def _add_dot(slide, left, top, size, rgb: RGBColor):
     shape = slide.shapes.add_shape(1, left, top, size, size)
     from pptx.oxml.ns import qn
-    sp = shape._element
-    spPr = sp.find(qn("p:spPr"))
-    prstGeom = spPr.find(qn("a:prstGeom"))
-    if prstGeom is not None:
-        prstGeom.set("prst", "ellipse")
+    sp    = shape._element
+    spPr  = sp.find(qn("p:spPr"))
+    geom  = spPr.find(qn("a:prstGeom"))
+    if geom is not None:
+        geom.set("prst", "ellipse")
     shape.fill.solid()
     shape.fill.fore_color.rgb = rgb
     shape.line.fill.background()
 
+
+def _format_eta(finish_date: str | None) -> str:
+    if not finish_date:
+        return "—"
+    try:
+        d = datetime.strptime(finish_date, "%Y-%m-%d").date()
+        return d.strftime("%b %-d")   # e.g. "Oct 15"
+    except Exception:
+        try:
+            d = datetime.strptime(finish_date, "%Y-%m-%d").date()
+            return d.strftime("%b %d")
+        except Exception:
+            return finish_date[:10]
+
+
+def _format_time_in_status(days: int | None) -> str:
+    if days is None:
+        return ""
+    if days == 0:
+        return "today"
+    if days < 7:
+        return f"{days}d"
+    weeks = days // 7
+    rem   = days % 7
+    return f"{weeks}w {rem}d" if rem else f"{weeks}w"
+
+
 # ── Slide builder ─────────────────────────────────────────────────────────────
 
 def add_slide(prs, chunk, slide_num, total_slides, today_str):
-    slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+    slide = prs.slides.add_slide(prs.slide_layouts[6])   # blank
 
     bg = slide.background
     bg.fill.solid()
@@ -174,51 +217,61 @@ def add_slide(prs, chunk, slide_num, total_slides, today_str):
     SH = prs.slide_height
     M  = Inches(0.38)
 
-    # Title
-    tb = slide.shapes.add_textbox(M, M, Inches(8.0), Inches(0.50))
-    tf = tb.text_frame
-    p  = tf.paragraphs[0]
-    run = p.add_run()
-    run.text = "L3 Agents Progress"
-    run.font.size  = Pt(22)
-    run.font.bold  = True
+    # ── Title ─────────────────────────────────────────────────────────────────
+    tb  = slide.shapes.add_textbox(M, M, Inches(7.5), Inches(0.50))
+    run = tb.text_frame.paragraphs[0].add_run()
+    run.text           = "L3 Agents Progress"
+    run.font.size      = Pt(22)
+    run.font.bold      = True
     run.font.color.rgb = TITLE_COLOR
 
-    # Subtitle
-    sb = slide.shapes.add_textbox(M, Inches(0.86), Inches(9.0), Inches(0.22))
-    tf2 = sb.text_frame
-    p2  = tf2.paragraphs[0]
-    run2 = p2.add_run()
+    sb  = slide.shapes.add_textbox(M, Inches(0.86), Inches(9.0), Inches(0.22))
+    run2 = sb.text_frame.paragraphs[0].add_run()
     run2.text = (
-        f"Project IAI · label: L3-Agents · PlannedPI: cf[14422] · Agent: cf[11140] · "
+        f"Project IAI · label: L3-Agents · ETA: cf[21221] · Agent: cf[11140] · "
         f"{today_str}  —  Slide {slide_num} of {total_slides}"
     )
-    run2.font.size  = Pt(8)
+    run2.font.size      = Pt(8)
     run2.font.color.rgb = SUBTITLE_CLR
 
-    # Legend (top-right)
-    dot_r   = Inches(0.13)
-    dot_gap = Inches(0.06)
-    lbl_w   = Inches(1.45)
-    leg_top = Inches(0.23)
-    total_leg_w = len(LEGEND_DOTS) * (dot_r + dot_gap + lbl_w + Inches(0.10))
-    leg_x   = SW - M - total_leg_w + Inches(0.1)
+    # ── Status legend (top-right) ─────────────────────────────────────────────
+    dot_r   = Inches(0.12)
+    dot_gap = Inches(0.05)
+    lbl_w   = Inches(1.40)
+    leg_top = Inches(0.22)
+    n_items = len(STATUS_LEGEND)
+    total_w = n_items * (dot_r + dot_gap + lbl_w + Inches(0.08))
+    leg_x   = SW - M - total_w + Inches(0.08)
 
-    for i, (color, label) in enumerate(LEGEND_DOTS):
-        x = leg_x + i * (dot_r + dot_gap + lbl_w + Inches(0.10))
-        add_legend_dot(slide, x, leg_top + Inches(0.04), dot_r, color)
+    for i, (color, label) in enumerate(STATUS_LEGEND):
+        x = leg_x + i * (dot_r + dot_gap + lbl_w + Inches(0.08))
+        _add_dot(slide, x, leg_top + Inches(0.04), dot_r, color)
         ltb = slide.shapes.add_textbox(x + dot_r + dot_gap, leg_top, lbl_w, Inches(0.22))
-        ltf = ltb.text_frame
-        lp  = ltf.paragraphs[0]
-        lr  = lp.add_run()
-        lr.text = label
-        lr.font.size  = Pt(8.5)
+        lr  = ltb.text_frame.paragraphs[0].add_run()
+        lr.text           = label
+        lr.font.size      = Pt(8)
         lr.font.color.rgb = DARK_TEXT
 
-    # Table
+    # ── Health legend (second row, top-right) ─────────────────────────────────
+    hlth_lbl_w = Inches(0.85)
+    hlth_top   = Inches(0.46)
+    n_hlth     = len(HEALTH_LEGEND)
+    total_hw   = n_hlth * (dot_r + dot_gap + hlth_lbl_w + Inches(0.08))
+    hlth_x     = SW - M - total_hw + Inches(0.08)
+
+    for i, (color, label) in enumerate(HEALTH_LEGEND):
+        x = hlth_x + i * (dot_r + dot_gap + hlth_lbl_w + Inches(0.08))
+        _add_dot(slide, x, hlth_top + Inches(0.04), dot_r, color)
+        ltb = slide.shapes.add_textbox(x + dot_r + dot_gap, hlth_top, hlth_lbl_w, Inches(0.22))
+        lr  = ltb.text_frame.paragraphs[0].add_run()
+        lr.text           = label
+        lr.font.size      = Pt(8)
+        lr.font.color.rgb = DARK_TEXT
+
+    # ── Table ─────────────────────────────────────────────────────────────────
     n_rows     = len(chunk) + 1
-    table_top  = Inches(1.12)
-    table_h    = SH - table_top - M - Inches(0.30)
+    table_top  = Inches(1.10)
+    table_h    = SH - table_top - M - Inches(0.18)
     table_w    = SW - 2 * M
     row_h_hdr  = Inches(0.38)
     row_h_data = (table_h - row_h_hdr) / max(len(chunk), 1)
@@ -237,45 +290,57 @@ def add_slide(prs, chunk, slide_num, total_slides, today_str):
     # Header row
     for ci, hdr in enumerate(HEADERS):
         cell = tbl.cell(0, ci)
-        set_cell_bg(cell, HEADER_BG)
-        add_cell_border(cell, BORDER_COLOR, 0.5)
-        set_cell_text(cell, hdr, 10, True, HEADER_TXT)
-        cell.margin_top    = Pt(5)
-        cell.margin_bottom = Pt(5)
-        cell.margin_left   = Pt(6)
-        cell.margin_right  = Pt(4)
+        _set_cell_bg(cell, HEADER_BG)
+        _add_cell_border(cell, BORDER_COLOR, 0.5)
+        _set_cell_text(cell, hdr, 10, True, HEADER_TXT)
+        cell.margin_top = cell.margin_bottom = Pt(5)
+        cell.margin_left = Pt(6)
+        cell.margin_right = Pt(4)
 
     # Data rows
     for ri, row in enumerate(chunk):
-        bg   = ROW_ALT_BG if ri % 2 == 1 else ROW_BG
-        s_color = STATUS_COLORS.get(row["status"], DIM_TEXT)
-        p_color = PHASE_COLORS.get(row["dev_phase"], DIM_TEXT)
-        phase_label = PHASES.get(row["dev_phase"], "—")
+        bg_row   = ROW_ALT_BG if ri % 2 == 1 else ROW_BG
+        s_color  = STATUS_COLORS.get(row["status"], DIM_TEXT)
+        health   = row.get("health", "On Track")
+        h_bg     = HEALTH_BG.get(health, ROW_BG)
+        h_txt    = HEALTH_TXT.get(health, DARK_TEXT)
 
-        values = [row["agent"], row["theme"], row["business_value"],
-                  row["impact"], row["status"], row["pi"], phase_label]
-        colors = [DIM_TEXT, DARK_TEXT, DARK_TEXT, DIM_TEXT, s_color, DARK_TEXT, p_color]
-        bolds  = [False, True, False, False, True, False, False]
+        tis_days = row.get("time_in_status_days")
+        tis_str  = _format_time_in_status(tis_days)
+        eta_str  = _format_eta(row.get("finish_date"))
 
-        for ci, (val, col, bold) in enumerate(zip(values, colors, bolds)):
+        # column index → (lines, sizes, bolds, colors, bg_override)
+        col_data = [
+            # Agent
+            ([row["agent"]], [8.5], [False], [DIM_TEXT], bg_row),
+            # Theme
+            ([row["theme"]], [8.5], [True],  [DARK_TEXT], bg_row),
+            # Business Value
+            ([row["business_value"]], [8.5], [False], [DARK_TEXT], bg_row),
+            # Impact
+            ([row["impact"]], [8.5], [False], [DIM_TEXT], bg_row),
+            # Status (+ time in status)
+            (
+                [row["status"], tis_str] if tis_str else [row["status"]],
+                [9, 7.5],
+                [True, False],
+                [s_color, DIM_TEXT],
+                bg_row,
+            ),
+            # ETA
+            ([eta_str], [8.5], [False], [DARK_TEXT], bg_row),
+            # Health — gets its own background color
+            ([HEALTH_LABELS[health]], [8.5], [True], [h_txt], h_bg),
+        ]
+
+        for ci, (lines, sizes, bolds, colors, bg_ci) in enumerate(col_data):
             cell = tbl.cell(ri + 1, ci)
-            set_cell_bg(cell, bg)
-            add_cell_border(cell, BORDER_COLOR, 0.4)
-            set_cell_text(cell, val, 9, bold, col)
-            cell.margin_top    = Pt(5)
-            cell.margin_bottom = Pt(5)
-            cell.margin_left   = Pt(6)
-            cell.margin_right  = Pt(4)
-
-    # Phase legend strip at bottom
-    leg_top = SH - M - Inches(0.22)
-    leg_box = slide.shapes.add_textbox(M, leg_top, SW - 2 * M, Inches(0.22))
-    ltf = leg_box.text_frame
-    lp  = ltf.paragraphs[0]
-    lr  = lp.add_run()
-    lr.text = "  ·  ".join(PHASE_LEGEND_SHORT)
-    lr.font.size      = Pt(7)
-    lr.font.color.rgb = RGBColor(0x88, 0x88, 0x99)
+            _set_cell_bg(cell, bg_ci)
+            _add_cell_border(cell, BORDER_COLOR, 0.4)
+            _set_cell_text(cell, lines, sizes, bolds, colors)
+            cell.margin_top = cell.margin_bottom = Pt(4)
+            cell.margin_left = Pt(6)
+            cell.margin_right = Pt(4)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -311,7 +376,15 @@ def main():
 
     prs.save(out_file)
     print(out_file)
-    print(f"Slides: {len(chunks)}  Rows: {len(rows)}", file=sys.stderr)
+
+    on_track  = sum(1 for r in rows if r.get("health") == "On Track")
+    at_risk   = sum(1 for r in rows if r.get("health") == "At Risk")
+    off_track = sum(1 for r in rows if r.get("health") == "Off Track")
+    print(
+        f"Slides: {len(chunks)}  Rows: {len(rows)}  "
+        f"Health: {on_track} On Track / {at_risk} At Risk / {off_track} Off Track",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
