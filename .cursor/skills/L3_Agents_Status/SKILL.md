@@ -137,7 +137,7 @@ Sort by status priority (then by Jira key ascending within each group):
 
 ---
 
-## Step 9 — Build the data payload and run the PPTX script
+## Step 9 — Build the data payload and run both generators in parallel
 
 Create a JSON file at `%TEMP%\l3_agents_data.json` with this structure:
 
@@ -166,15 +166,22 @@ Field notes:
 - `finish_date`: ISO date string (`"YYYY-MM-DD"`) or `null`
 - `time_in_status_days`: integer ≥ 0
 - `health`: `"On Track"` | `"At Risk"` | `"Off Track"`
-- `dev_phase` is NOT included in the payload (removed from slide to make room for Health)
+- `dev_phase` is NOT included in the payload (removed from slides to make room for Health)
 
-Then run the bundled PPTX generator, replacing `<skill_dir>` with the directory of this SKILL.md:
+Then run **both generators** (they read the same JSON, so they can run sequentially or in parallel):
 
 ```powershell
+# PPTX slide deck
 python "<skill_dir>\scripts\generate_pptx.py" --data "%TEMP%\l3_agents_data.json"
+
+# Cursor Canvas (live table beside the chat)
+python "<skill_dir>\scripts\generate_canvas.py" --data "%TEMP%\l3_agents_data.json"
 ```
 
-The script prints the full output path to stdout on success.
+The canvas is written to:
+`C:\Users\yhalperin\.cursor\projects\c-Users-yhalperin-source\canvases\l3-agents-status.canvas.tsx`
+
+Each script prints its output path to stdout on success.
 
 ---
 
@@ -182,7 +189,8 @@ The script prints the full output path to stdout on success.
 
 Tell the user:
 - Full path to the generated PPTX
-- Number of slides and rows
+- Link to the canvas file so they can open it beside the chat:
+  `[L3 Agents Status](C:\Users\yhalperin\.cursor\projects\c-Users-yhalperin-source\canvases\l3-agents-status.canvas.tsx)`
 - Summary of health: how many On Track / At Risk / Off Track
 - Any themes with no finish date or missing PI
-- Any Off Track themes (by name, so they're easy to spot)
+- Any Off Track themes by name
