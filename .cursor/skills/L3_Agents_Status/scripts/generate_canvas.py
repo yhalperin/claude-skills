@@ -100,7 +100,7 @@ def main():
 
 CANVAS_TEMPLATE = """\
 import {
-  H1, Stack, Row, Grid, Stat, Table, Text, Divider, Callout,
+  H1, Stack, Grid, Stat, Table, Text, Divider, Callout,
 } from "cursor/canvas";
 import { useHostTheme } from "cursor/canvas";
 import type { TableRowTone } from "cursor/canvas";
@@ -125,25 +125,26 @@ interface RowData {
 
 const ROWS: RowData[] = __ROWS_JSON__;
 
-// ── Status badge ───────────────────────────────────────────────────────────────
+// ── Badges ─────────────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: string }) {
+function StatusCell({ status, timeInStatus }: { status: string; timeInStatus: string }) {
   const theme = useHostTheme();
   const color =
-    status === "In Progress"           ? theme.category.blue
-    : status === "HL Dev Discovery"    ? theme.category.gray
-    : status === "HL Product Discovery"? theme.category.gray
-    : status === "Planned"             ? theme.category.green
-    : status === "Done"                ? theme.category.gray
-    :                                   theme.category.gray;
+    status === "In Progress"            ? theme.category.blue
+    : status === "HL Dev Discovery"     ? theme.category.gray
+    : status === "HL Product Discovery" ? theme.category.gray
+    : status === "Planned"              ? theme.category.green
+    : status === "Done"                 ? theme.category.gray
+    :                                    theme.category.gray;
   return (
-    <Text size="small" weight="semibold" style={{ color }}>
-      {status}
-    </Text>
+    <Stack gap={2}>
+      <Text size="small" weight="semibold" style={{ color }}>{status}</Text>
+      {timeInStatus && (
+        <Text size="small" tone="tertiary">{timeInStatus}</Text>
+      )}
+    </Stack>
   );
 }
-
-// ── Health badge ───────────────────────────────────────────────────────────────
 
 function HealthBadge({ health }: { health: string }) {
   const theme = useHostTheme();
@@ -152,9 +153,7 @@ function HealthBadge({ health }: { health: string }) {
     : health === "At Risk" ? theme.category.yellow
     :                        theme.category.red;
   return (
-    <Text size="small" weight="semibold" style={{ color }}>
-      {health}
-    </Text>
+    <Text size="small" weight="semibold" style={{ color }}>{health}</Text>
   );
 }
 
@@ -170,13 +169,14 @@ export default function L3AgentsStatus() {
     .map(r => r.themeMain)
     .join(", ");
 
+  // Exact same 7 columns as the PPTX slides:
+  //   Agent | Theme | Business Value | Impact | Status (+time) | ETA | Health
   const tableHeaders = [
     "Agent (Master Feature)",
-    "Theme",
+    "Theme Name (Jira ID)",
     "Business Value",
     "Impact",
     "Status",
-    "Time in Status",
     "ETA",
     "Health",
   ];
@@ -189,8 +189,7 @@ export default function L3AgentsStatus() {
     </Stack>,
     <Text size="small">{r.businessValue}</Text>,
     <Text size="small" tone="secondary">{r.impact}</Text>,
-    <StatusBadge status={r.status} />,
-    <Text size="small" tone="tertiary">{r.timeInStatus || "—"}</Text>,
+    <StatusCell status={r.status} timeInStatus={r.timeInStatus} />,
     <Text size="small">{r.eta}</Text>,
     <HealthBadge health={r.health} />,
   ]);
